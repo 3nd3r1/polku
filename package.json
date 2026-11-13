@@ -8,9 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:up": "docker compose up -d",
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@elevenlabs/react": "1.22.1",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.6",
     "postgres": "^4.1.1",
