@@ -56,7 +56,7 @@ export function sayThis(evaluation: Evaluation, pathway: Pathway): string {
     case "fast_track": {
       const c = evaluation.matches[0].criterion;
       const source = pathway.sources.find((s) => s.id === c.sourceId);
-      return `Your symptoms match a published criterion for a fast-track assessment: ${c.gloss.toLowerCase()} (${source?.title ?? c.sourceId}). This is not a diagnosis. A nurse will call you within ${callback?.maxDays ?? 2} days.`;
+      return `Your symptoms match a published criterion for a fast-track assessment: ${c.gloss.toLowerCase()} (source: ${source?.spokenName ?? c.sourceId}). This is not a diagnosis. A nurse will call you within ${callback?.maxDays ?? 2} days.`;
     }
     case "see_gp":
       return "Your symptoms don't match a fast-track criterion, but they are worth checking. Please book an appointment at your health centre.";

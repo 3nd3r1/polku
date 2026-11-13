@@ -28,19 +28,32 @@ export type Smoking = z.infer<typeof Smoking>;
 
 /** One symptom as extracted by the LLM, tied to the caller's own words. */
 export const Observation = z.object({
-  code: SymptomCode,
-  durationDays: z.number().int().min(0).max(36500).optional(),
-  quote: z.string().min(1).max(500),
+  code: SymptomCode.describe(
+    "Symptom code. HAEMOPTYSIS_REPEATED = blood in sputum more than once. Use HAEMOPTYSIS_MASSIVE, DYSPNOEA_SEVERE or CHEST_PAIN_ACUTE_SEVERE only for heavy bleeding, breathlessness at rest right now, or sudden severe chest pain.",
+  ),
+  durationDays: z
+    .number()
+    .int()
+    .min(0)
+    .max(36500)
+    .optional()
+    .describe("How long the symptom has lasted, in days. Omit if the caller did not say."),
+  quote: z.string().min(1).max(500).describe("The caller's own words for this symptom, verbatim."),
   /** A cause the caller gave themselves ("I fell skiing"). Present = explained. */
-  knownCause: z.string().min(1).max(200).optional(),
+  knownCause: z
+    .string()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe("A cause the caller gave for this symptom, e.g. 'fell skiing'. Omit if none."),
 });
 export type Observation = z.infer<typeof Observation>;
 
 /** The record_intake tool payload. Validated at the API boundary. */
 export const Intake = z.object({
-  age: z.number().int().min(0).max(120).optional(),
-  smoking: Smoking,
-  observations: z.array(Observation).max(20),
+  age: z.number().int().min(0).max(120).optional().describe("Caller's age in years."),
+  smoking: Smoking.describe("Smoking status. Use unknown if not asked or not answered."),
+  observations: z.array(Observation).max(20).describe("One entry per symptom the caller described."),
 });
 export type Intake = z.infer<typeof Intake>;
 
@@ -49,6 +62,8 @@ export type Intake = z.infer<typeof Intake>;
 export type Source = {
   id: string;
   title: string;
+  /** How the voice agent names it out loud. */
+  spokenName: string;
   url: string;
   verification: "read" | "partially_verified" | "design_choice";
 };
