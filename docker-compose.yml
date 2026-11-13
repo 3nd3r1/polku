@@ -1,0 +1,14 @@
+# Local dev database. Production uses Aiven Postgres via DATABASE_URL.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: polku
+      POSTGRES_PASSWORD: polku
+      POSTGRES_DB: polku
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
