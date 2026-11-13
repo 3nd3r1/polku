@@ -21,40 +21,100 @@ const post = async (url: string, body?: unknown) =>
     })
   ).json();
 
-/** Scripted calls for demos without a phone. Synthetic people and words. */
-const SAMPLES: { label: string; personId: string; intake: Intake }[] = [
+type Turn = { agent: string } | { caller: string } | { tool: "verify" } | { tool: "intake"; intake: Intake };
+
+/** Scripted calls for demos without a phone. Synthetic people and words; the tools hit the real API. */
+const SAMPLES: { label: string; personId: string; script: Turn[] }[] = [
   {
     label: "Matti",
     personId: "matti",
-    intake: {
-      smoking: "former",
-      observations: [{ code: "COUGH_NEW", durationDays: 49, quote: "I've had this cough for about seven weeks now" }],
-    },
+    script: [
+      {
+        agent:
+          "Hi, this is Polku, the lung symptom line. I'm an AI assistant. First I'll send an identification request to your phone.",
+      },
+      { tool: "verify" },
+      { agent: "Thank you, Matti. What symptoms have you been having?" },
+      { caller: "I've had this cough for about seven weeks now. It just won't go away." },
+      { agent: "Did it start after a cold, or anything else you know of?" },
+      { caller: "No, nothing like that." },
+      { agent: "Do you smoke, or have you smoked before?" },
+      { caller: "I quit about ten years ago." },
+      {
+        tool: "intake",
+        intake: {
+          smoking: "former",
+          observations: [
+            { code: "COUGH_NEW", durationDays: 49, quote: "I've had this cough for about seven weeks now" },
+          ],
+        },
+      },
+    ],
   },
   {
     label: "Aino",
     personId: "aino",
-    intake: {
-      smoking: "never",
-      observations: [{ code: "COUGH_NEW", durationDays: 25, quote: "a cough that won't go away, almost four weeks" }],
-    },
+    script: [
+      {
+        agent:
+          "Hi, this is Polku, the lung symptom line. I'm an AI assistant. First I'll send an identification request to your phone.",
+      },
+      { tool: "verify" },
+      { agent: "Thank you, Aino. What symptoms have you been having?" },
+      { caller: "A cough that won't go away, almost four weeks now." },
+      { agent: "Do you smoke, or have you smoked before?" },
+      { caller: "No, never." },
+      {
+        tool: "intake",
+        intake: {
+          smoking: "never",
+          observations: [
+            { code: "COUGH_NEW", durationDays: 25, quote: "a cough that won't go away, almost four weeks now" },
+          ],
+        },
+      },
+    ],
   },
   {
     label: "Seppo (emergency)",
     personId: "seppo",
-    intake: {
-      smoking: "current",
-      observations: [{ code: "HAEMOPTYSIS_MASSIVE", quote: "I'm coughing up a lot of blood right now" }],
-    },
+    script: [
+      {
+        agent:
+          "Hi, this is Polku, the lung symptom line. I'm an AI assistant. First I'll send an identification request to your phone.",
+      },
+      { tool: "verify" },
+      { agent: "Thank you, Seppo. What symptoms have you been having?" },
+      { caller: "I'm coughing up a lot of blood right now." },
+      {
+        tool: "intake",
+        intake: {
+          smoking: "current",
+          observations: [{ code: "HAEMOPTYSIS_MASSIVE", quote: "I'm coughing up a lot of blood right now" }],
+        },
+      },
+    ],
   },
 ];
 
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Plays a script at roughly speaking pace, through the same endpoints a live call uses. */
 async function simulateCall(s: (typeof SAMPLES)[number], onStarted: (id: string) => void) {
   const { callId } = await post("/api/calls");
   onStarted(callId);
-  await post(`/api/calls/${callId}/verify`, { personId: s.personId });
-  await new Promise((r) => setTimeout(r, 1500));
-  await post(`/api/intake?channel=sample&call=${callId}`, s.intake);
+  const say = (role: "agent" | "caller", text: string) => post(`/api/calls/${callId}/transcript`, { role, text });
+  for (const turn of s.script) {
+    await pause(1600);
+    if ("agent" in turn) await say("agent", turn.agent);
+    else if ("caller" in turn) await say("caller", turn.caller);
+    else if (turn.tool === "verify") await post(`/api/calls/${callId}/verify`, { personId: s.personId });
+    else {
+      const r = await post(`/api/intake?channel=sample&call=${callId}`, turn.intake);
+      await pause(800);
+      await say("agent", r.sayThis);
+    }
+  }
 }
 
 export function Screening() {
@@ -68,9 +128,7 @@ export function Screening() {
 function ScreeningInner() {
   const [calls, setCalls] = useState<CallView[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState<{ role: string; text: string }[]>([]);
   const liveCallId = useRef<string | null>(null); // read by the agent's tools
-  const [liveId, setLiveId] = useState<string | null>(null); // read by render
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/calls", { cache: "no-store" });
@@ -85,24 +143,28 @@ function ScreeningInner() {
 
   // Browser call stands in for the phone line in the demo.
   const conversation = useConversation({
-    onMessage: (m) => setTranscript((t) => [...t, { role: m.role, text: m.message }]),
+    onMessage: (m) =>
+      liveCallId.current &&
+      post(`/api/calls/${liveCallId.current}/transcript`, {
+        role: m.role === "user" ? "caller" : "agent",
+        text: m.message,
+      }),
   });
   useConversationClientTool("verify_identity", async () => {
     const r = await post(`/api/calls/${liveCallId.current}/verify`);
-    return r.sayThis ?? `Identification failed: ${r.error}`;
+    return r.sayThis ?? r.error;
   });
   useConversationClientTool("record_intake", async (params) => {
     const r = await post(`/api/intake?channel=web_call&call=${liveCallId.current}`, params);
-    return r.sayThis ?? `Could not record the intake: ${r.error}. Ask for what is missing and try again.`;
+    // On a gap the server says exactly what to ask next; the agent asks and calls again.
+    return r.sayThis ?? r.error;
   });
   const live = conversation.status === "connected" || conversation.status === "connecting";
 
   async function startVoiceCall() {
     const { callId } = await post("/api/calls");
     liveCallId.current = callId;
-    setLiveId(callId);
     setSelectedId(callId);
-    setTranscript([]);
     conversation.startSession({ agentId: AGENT_ID!, connectionType: "webrtc" });
   }
 
@@ -149,14 +211,9 @@ function ScreeningInner() {
             </button>
           ))}
         </div>
-
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        {selected && (
-          <CallDetail c={selected} transcript={selected.id === liveId ? transcript : []} />
-        )}
-      </main>
+      <main className="min-w-0 flex-1 overflow-y-auto">{selected && <CallDetail c={selected} />}</main>
     </div>
   );
 }
@@ -179,92 +236,102 @@ function CallState({ c }: { c: CallView }) {
   return <p className={`mt-1 text-xs ${tone}`}>{text}</p>;
 }
 
-function CallDetail({ c, transcript }: { c: CallView; transcript: { role: string; text: string }[] }) {
+function CallDetail({ c }: { c: CallView }) {
   const k = c.case;
   const criterion = k && lung.criteria.find((x) => x.id === k.matches[0]?.criterionId);
   const source = criterion && lung.sources.find((s) => s.id === criterion.sourceId);
   const callback = k?.clocks.find((x) => x.stepId === "callback");
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-8 px-8 py-10">
+    <div className="flex flex-col gap-8 px-8 py-10">
       <header>
-        <p className="label">AI screening · call {clockTime(c.startedAt)}</p>
+        <p className="label">Call {clockTime(c.startedAt)}</p>
         <h1 className="mt-2 text-3xl font-light">{c.person?.name ?? "Unknown caller"}</h1>
       </header>
 
-      <ol className="border-l border-line">
-        <Stage title="Strong identification" done={c.person !== null} active={c.status === "verifying"}>
-          {c.person ? (
-            <>
-              <p>
-                {ageOf(c.person)} y · {c.person.county} · {c.person.phone}
-              </p>
-              <p className="text-xs text-dim">Mobile ID · simulated, synthetic person</p>
-            </>
-          ) : c.status === "verifying" ? (
-            <p className="text-warn">Mobile ID request sent to the caller&rsquo;s phone…</p>
-          ) : null}
-        </Stage>
-
-        <Stage title="Symptoms" done={k !== null} active={c.status === "verified"}>
-          {k ? (
-            <ul className="flex flex-col gap-2">
-              {k.intake.observations.map((o, i) => (
-                <li key={i}>
-                  <p>
-                    {SYMPTOM_LABEL[o.code]}
-                    {o.durationDays !== undefined && <span className="text-muted">, {formatDuration(o.durationDays)}</span>}
-                  </p>
-                  <p className="text-sm text-muted">&ldquo;{o.quote}&rdquo;</p>
-                </li>
-              ))}
-              <li className="text-muted">{SMOKING_LABEL[k.intake.smoking]}</li>
-            </ul>
-          ) : c.status === "verified" ? (
-            <p className="text-warn">Listening…</p>
-          ) : null}
-        </Stage>
-
-        <Stage title="Criteria check" done={k !== null}>
-          {k &&
-            (criterion ? (
-              <>
-                <p>{criterion.gloss}</p>
-                {source && <p className="text-xs text-dim">{source.spokenName.replace(/^the /, "Source: ")}</p>}
-              </>
-            ) : (
-              <p className="text-muted">No pathway criterion matched.</p>
-            ))}
-        </Stage>
-
-        <Stage title="Outcome" done={k !== null} last>
-          {k?.outcome === "fast_track" && callback && (
-            <div className="flex flex-wrap items-center gap-4">
-              <p className="text-lg">Nurse callback by {dayAndTime(callback.dueAt)}</p>
-              <Link href="/nurse" className="text-sm text-muted hover:text-fg">
-                Open in nurse view →
-              </Link>
-            </div>
-          )}
-          {k?.outcome === "call_112" && <p className="text-lg text-alert">Told to hang up and call 112</p>}
-          {k?.outcome === "see_gp" && <p className="text-lg">Advised to book a GP appointment</p>}
-          {k?.outcome === "no_match" && <p className="text-lg text-muted">No fast track. Told to contact their health centre if worried.</p>}
-        </Stage>
-      </ol>
-
-      {transcript.length > 0 && (
+      <div className="grid gap-10 xl:grid-cols-2">
         <section>
-          <p className="label">Live transcript</p>
-          <ol className="mt-3 flex flex-col gap-2 text-sm">
-            {transcript.map((t, i) => (
-              <li key={i} className={t.role === "user" ? "text-fg" : "text-muted"}>
-                <span className="text-dim">{t.role === "user" ? "Caller" : "Polku"}: </span>
+          <p className="label">Conversation</p>
+          {c.transcript.length === 0 && <p className="mt-3 text-sm text-dim">Ringing…</p>}
+          <ol className="mt-3 flex flex-col gap-3">
+            {c.transcript.map((t, i) => (
+              <li
+                key={i}
+                className={`max-w-[85%] px-4 py-2.5 text-sm ${t.role === "caller" ? "self-end bg-raised" : "border border-line text-muted"}`}
+              >
                 {t.text}
               </li>
             ))}
           </ol>
         </section>
-      )}
+
+        <section>
+          <p className="label">AI screening</p>
+          <ol className="mt-3 border-l border-line">
+            <Stage title="Strong identification" done={c.person !== null} active={c.status === "verifying"}>
+              {c.person ? (
+                <>
+                  <p>
+                    {ageOf(c.person)} y · {c.person.county} · {c.person.phone}
+                  </p>
+                  <p className="text-xs text-dim">Mobile ID · simulated, synthetic person</p>
+                </>
+              ) : c.status === "verifying" ? (
+                <p className="text-warn">Mobile ID request sent to the caller&rsquo;s phone…</p>
+              ) : null}
+            </Stage>
+
+            <Stage title="Symptoms" done={k !== null} active={c.status === "verified"}>
+              {k ? (
+                <ul className="flex flex-col gap-2">
+                  {k.intake.observations.map((o, i) => (
+                    <li key={i}>
+                      <p>
+                        {SYMPTOM_LABEL[o.code]}
+                        {o.durationDays !== undefined && (
+                          <span className="text-muted">, {formatDuration(o.durationDays)}</span>
+                        )}
+                      </p>
+                      <p className="text-sm text-muted">&ldquo;{o.quote}&rdquo;</p>
+                    </li>
+                  ))}
+                  <li className="text-muted">{SMOKING_LABEL[k.intake.smoking]}</li>
+                </ul>
+              ) : c.status === "verified" ? (
+                <p className="text-warn">Listening…</p>
+              ) : null}
+            </Stage>
+
+            <Stage title="Criteria check" done={k !== null}>
+              {k &&
+                (criterion ? (
+                  <>
+                    <p>{criterion.gloss}</p>
+                    {source && <p className="text-xs text-dim">{source.spokenName.replace(/^the /, "Source: ")}</p>}
+                  </>
+                ) : (
+                  <p className="text-muted">No pathway criterion matched.</p>
+                ))}
+            </Stage>
+
+            <Stage title="Outcome" done={k !== null} last>
+              {k?.outcome === "fast_track" && callback && (
+                <div className="flex flex-wrap items-center gap-4">
+                  <p className="text-lg">Nurse callback by {dayAndTime(callback.dueAt)}</p>
+                  <Link href="/nurse" className="text-sm text-muted hover:text-fg">
+                    Open in nurse view →
+                  </Link>
+                </div>
+              )}
+              {k?.outcome === "call_112" && <p className="text-lg text-alert">Told to hang up and call 112</p>}
+              {k?.outcome === "see_gp" && <p className="text-lg">Advised to book a GP appointment</p>}
+              {k?.outcome === "no_match" && (
+                <p className="text-lg text-muted">No fast track. Told to contact their health centre if worried.</p>
+              )}
+            </Stage>
+          </ol>
+        </section>
+      </div>
     </div>
   );
 }
