@@ -1,10 +1,11 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
-import { audit, type CASE_STATUSES, cases, clocks, type CHANNELS } from "../db/schema";
+import { audit, calls, type CASE_STATUSES, cases, clocks, type CHANNELS } from "../db/schema";
 import { evaluate, sayThis, type Outcome } from "../ontology/engine";
 import type { Intake } from "../ontology/schema";
 import { lung } from "../pathways/lung";
+import { ageOf, type Person } from "../sim/people";
 import { publishChange } from "./bus";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -27,8 +28,16 @@ async function startClock(tx: Tx, caseId: string, stepId: StepId, now: Date) {
   return dueAt;
 }
 
-/** SubmitIntake, plus OpenFastTrackCase when a suspicion criterion matches. */
-export async function submitIntake(intake: Intake, channel: (typeof CHANNELS)[number]) {
+/**
+ * SubmitIntake, plus OpenFastTrackCase when a suspicion criterion matches.
+ * With a verified call, age comes from the identity, never from the LLM.
+ */
+export async function submitIntake(raw: Intake, channel: (typeof CHANNELS)[number], callId?: string) {
+  const [call] = callId ? await db.select().from(calls).where(eq(calls.id, callId)) : [];
+  if (callId && !call) throw new ActionError("Call not found", 404);
+  const person = call?.person ?? null;
+  const intake: Intake = person ? { ...raw, age: ageOf(person) } : raw;
+
   const evaluation = evaluate(intake, lung);
   const fastTrack = evaluation.outcome === "fast_track";
   const now = new Date();
@@ -40,6 +49,9 @@ export async function submitIntake(intake: Intake, channel: (typeof CHANNELS)[nu
       .values({
         createdAt: now,
         channel,
+        callId: call?.id ?? null,
+        person,
+        county: person?.county ?? null,
         pathwayId: lung.id,
         pathwayVersion: lung.version,
         intake,
@@ -61,6 +73,7 @@ export async function submitIntake(intake: Intake, channel: (typeof CHANNELS)[nu
         data: { criterionId: evaluation.matches[0].criterion.id },
       });
     }
+    if (call) await tx.update(calls).set({ status: "screened" }).where(eq(calls.id, call.id));
     return row.id;
   });
 
@@ -121,6 +134,8 @@ export async function applyCaseAction(caseId: string, action: CaseAction) {
 export type ClockView = { stepId: string; startedAt: string; dueAt: string; stoppedAt: string | null };
 export type CaseView = {
   id: string;
+  callId: string | null;
+  person: Person | null;
   createdAt: string;
   channel: (typeof CHANNELS)[number];
   outcome: Outcome;
@@ -131,7 +146,10 @@ export type CaseView = {
 };
 
 export async function listCases(limit = 50): Promise<CaseView[]> {
-  const rows = await db.select().from(cases).orderBy(desc(cases.createdAt)).limit(limit);
+  return toCaseViews(await db.select().from(cases).orderBy(desc(cases.createdAt)).limit(limit));
+}
+
+export async function toCaseViews(rows: (typeof cases.$inferSelect)[]): Promise<CaseView[]> {
   if (rows.length === 0) return [];
   const clockRows = await db
     .select()
@@ -146,6 +164,8 @@ export async function listCases(limit = 50): Promise<CaseView[]> {
 
   return rows.map((r) => ({
     id: r.id,
+    callId: r.callId,
+    person: r.person,
     createdAt: r.createdAt.toISOString(),
     channel: r.channel,
     outcome: r.outcome,
