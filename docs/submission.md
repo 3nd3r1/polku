@@ -11,7 +11,7 @@ Polku
 ## Punchline
 
 ```
-A sovereign ontology for Finnish cancer care: patients call, published Nordic criteria decide, a nurse calls back, and every pathway step runs on a clock per county.
+A phone line that puts every suspected lung cancer patient on the clock, run on a sovereign ontology of published Nordic criteria, with per-county waiting times Finland can't measure today.
 ```
 
 ## Description
