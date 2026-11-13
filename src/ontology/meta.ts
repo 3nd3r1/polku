@@ -1,7 +1,8 @@
 /**
- * The ontology metamodel: object types, link types, and the instance graph.
- * Everything the screens, scheduler and cockpit know about the world is an
- * object of a registered type, connected by a registered link type.
+ * The ontology metamodel: object types, and directed link types between them.
+ * A "creates" link is an action: the source object, through that action,
+ * brings the target object into being (a call creates a case). A "relates"
+ * link is structure (a hospital is in a county).
  * Add a type here, add its objects in a data file, and every view picks it up.
  */
 
@@ -13,11 +14,19 @@ export type ObjectTypeDef = {
   label: string;
   plural: string;
   description: string;
-  /** Kept separate so the explorer can group the graph. */
-  layer: "care" | "pathway" | "case";
+  layer: "case" | "care" | "pathway";
 };
 
-export type LinkTypeDef = { id: string; label: string; from: string; to: string };
+export type LinkTypeDef = {
+  id: string;
+  label: string;
+  from: string;
+  to: string;
+  kind: "creates" | "relates";
+  /** For "creates": the action and who performs it. */
+  action?: string;
+  actor?: string;
+};
 
 export type PropValue = string | number | boolean | null;
 
@@ -39,37 +48,46 @@ export type OntGraph = { objects: OntObject[]; links: OntLink[] };
 export const key = (type: string, id: string) => `${type}:${id}`;
 
 export const OBJECT_TYPES = [
+  { id: "Person", label: "Person", plural: "People", layer: "case", description: "A strongly identified caller (synthetic)" },
+  { id: "Call", label: "Call", plural: "Calls", layer: "case", description: "One phone call to the Polku line" },
+  { id: "Case", label: "Case", plural: "Cases", layer: "case", description: "A caller's symptoms and where they are in the pathway" },
+  { id: "Clock", label: "Clock", plural: "Clocks", layer: "case", description: "Timer for one pathway step of one case" },
+  { id: "Appointment", label: "Appointment", plural: "Appointments", layer: "case", description: "A booked session for a step" },
   { id: "County", label: "County", plural: "Counties", layer: "care", description: "Wellbeing county (hyvinvointialue) that organises care" },
-  { id: "Facility", label: "Facility", plural: "Facilities", layer: "care", description: "Hospital that runs specialist steps" },
+  { id: "Facility", label: "Hospital", plural: "Hospitals", layer: "care", description: "Hospital that runs the specialist steps" },
+  { id: "Resource", label: "Resource", plural: "Resources", layer: "care", description: "A schedulable unit, such as a CT scanner, with weekly sessions" },
   { id: "Capability", label: "Capability", plural: "Capabilities", layer: "care", description: "A kind of service a step needs, such as CT" },
-  { id: "Resource", label: "Resource", plural: "Resources", layer: "care", description: "A schedulable unit with weekly sessions" },
   { id: "Pathway", label: "Pathway", plural: "Pathways", layer: "pathway", description: "A versioned cancer pathway definition" },
   { id: "Step", label: "Step", plural: "Steps", layer: "pathway", description: "Pathway step with a maximum time" },
   { id: "Criterion", label: "Criterion", plural: "Criteria", layer: "pathway", description: "Published entry criterion" },
-  { id: "Source", label: "Source", plural: "Sources", layer: "pathway", description: "Document a rule or number comes from" },
   { id: "Symptom", label: "Symptom", plural: "Symptoms", layer: "pathway", description: "Controlled symptom vocabulary" },
-  { id: "Person", label: "Person", plural: "People", layer: "case", description: "Identified caller (synthetic)" },
-  { id: "Case", label: "Case", plural: "Cases", layer: "case", description: "A caller's intake and pathway position" },
-  { id: "Clock", label: "Clock", plural: "Clocks", layer: "case", description: "Timer for one step of one case" },
+  { id: "Source", label: "Source", plural: "Sources", layer: "pathway", description: "Document a rule or number comes from" },
 ] as const satisfies readonly ObjectTypeDef[];
 
 export type ObjectTypeId = (typeof OBJECT_TYPES)[number]["id"];
 
 export const LINK_TYPES = [
-  { id: "facility_in", label: "in county", from: "Facility", to: "County" },
-  { id: "resource_at", label: "at", from: "Resource", to: "Facility" },
-  { id: "provides", label: "provides", from: "Resource", to: "Capability" },
-  { id: "step_of", label: "step of", from: "Step", to: "Pathway" },
-  { id: "next_step", label: "then", from: "Step", to: "Step" },
-  { id: "requires", label: "requires", from: "Step", to: "Capability" },
-  { id: "criterion_of", label: "criterion of", from: "Criterion", to: "Pathway" },
-  { id: "on_symptom", label: "on symptom", from: "Criterion", to: "Symptom" },
-  { id: "cites", label: "cites", from: "Criterion", to: "Source" },
-  { id: "step_cites", label: "cites", from: "Step", to: "Source" },
-  { id: "lives_in", label: "lives in", from: "Person", to: "County" },
-  { id: "case_of", label: "case of", from: "Case", to: "Person" },
-  { id: "matched", label: "matched", from: "Case", to: "Criterion" },
-  { id: "clock_of", label: "clock of", from: "Clock", to: "Case" },
-  { id: "times", label: "times", from: "Clock", to: "Step" },
-  { id: "booked_on", label: "booked on", from: "Clock", to: "Resource" },
+  // What creates what
+  { id: "places", label: "places", from: "Person", to: "Call", kind: "creates", action: "Phone call", actor: "Caller" },
+  { id: "opens", label: "opens", from: "Call", to: "Case", kind: "creates", action: "Record intake", actor: "AI agent" },
+  { id: "starts", label: "starts", from: "Case", to: "Clock", kind: "creates", action: "Start clock", actor: "Nurse" },
+  { id: "books", label: "books", from: "Clock", to: "Appointment", kind: "creates", action: "Book slot", actor: "Nurse" },
+  // Structure
+  { id: "matched", label: "matched", from: "Case", to: "Criterion", kind: "relates" },
+  { id: "times", label: "times", from: "Clock", to: "Step", kind: "relates" },
+  { id: "on", label: "on", from: "Appointment", to: "Resource", kind: "relates" },
+  { id: "lives_in", label: "lives in", from: "Person", to: "County", kind: "relates" },
+  { id: "resource_at", label: "at", from: "Resource", to: "Facility", kind: "relates" },
+  { id: "provides", label: "provides", from: "Resource", to: "Capability", kind: "relates" },
+  { id: "facility_in", label: "in", from: "Facility", to: "County", kind: "relates" },
+  { id: "step_of", label: "step of", from: "Step", to: "Pathway", kind: "relates" },
+  { id: "next_step", label: "then", from: "Step", to: "Step", kind: "relates" },
+  { id: "requires", label: "requires", from: "Step", to: "Capability", kind: "relates" },
+  { id: "criterion_of", label: "entry to", from: "Criterion", to: "Pathway", kind: "relates" },
+  { id: "on_symptom", label: "on", from: "Criterion", to: "Symptom", kind: "relates" },
+  { id: "cites", label: "cites", from: "Criterion", to: "Source", kind: "relates" },
+  { id: "step_cites", label: "cites", from: "Step", to: "Source", kind: "relates" },
 ] as const satisfies readonly LinkTypeDef[];
+
+export const linkType = (id: string): LinkTypeDef | undefined => LINK_TYPES.find((l) => l.id === id);
+export const objectType = (id: string) => OBJECT_TYPES.find((t) => t.id === id);

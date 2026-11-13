@@ -1,105 +1,85 @@
 "use client";
 
-import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type SimulationNodeDatum } from "d3-force";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LINK_TYPES, OBJECT_TYPES, type OntGraph, type OntObject } from "@/ontology/meta";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { LINK_TYPES, type LinkTypeDef, linkType, OBJECT_TYPES, objectType, type OntGraph, type OntObject } from "@/ontology/meta";
+
+const LINKS: readonly LinkTypeDef[] = LINK_TYPES;
 
 const COLOR: Record<string, string> = {
+  Person: "#3fb37f",
+  Call: "#5fc99a",
+  Case: "#e07a5f",
+  Clock: "#f0a989",
+  Appointment: "#f2c6a0",
   County: "#5b9bd5",
   Facility: "#7fb3e8",
-  Capability: "#9b8cd9",
   Resource: "#b4a7f0",
+  Capability: "#9b8cd9",
   Pathway: "#e6e6e3",
   Step: "#d9a43b",
   Criterion: "#e8c872",
-  Source: "#8d9294",
-  Symptom: "#5b6062",
-  Person: "#3fb37f",
-  Case: "#e07a5f",
-  Clock: "#f0a989",
+  Symptom: "#8d9294",
+  Source: "#6f7577",
 };
-const SIZE: Record<string, number> = { County: 14, Pathway: 16, Facility: 11, Case: 12, Step: 10, Person: 10 };
-const LAYER_X = { care: -420, pathway: 0, case: 420 } as const;
-const LAYER_LABEL = { care: "Care network", pathway: "Pathway definition", case: "Live cases" } as const;
-const ALWAYS_LABEL = new Set(["County", "Facility", "Pathway", "Step", "Case", "Person", "Capability"]);
 const PROVENANCE: Record<OntObject["provenance"], { label: string; cls: string }> = {
   real: { label: "Real · public", cls: "border-info text-info" },
   synthetic: { label: "Synthetic", cls: "border-warn text-warn" },
   design: { label: "Polku design", cls: "border-line-strong text-muted" },
 };
+const LAYER_LABEL = { case: "Patient journey", care: "Care network", pathway: "Pathway definition" } as const;
 
-type Node = SimulationNodeDatum & { key: string; type: string; title: string; size: number };
-type Edge = { source: string; target: string; label: string };
-type Layout = { nodes: Node[]; edges: Edge[]; box: { x: number; y: number; w: number; h: number } };
-type View = { x: number; y: number; k: number };
+const W = 180;
+const H = 66;
 
-const layerOf = (type: string) => OBJECT_TYPES.find((t) => t.id === type)?.layer ?? "pathway";
+/** Model view: where each object type sits. The top row is the creation chain. */
+const MODEL_POS: Record<string, [number, number]> = {
+  Person: [100, 110],
+  Call: [390, 110],
+  Case: [680, 110],
+  Clock: [970, 110],
+  Appointment: [1260, 110],
+  Symptom: [390, 340],
+  Criterion: [680, 340],
+  Step: [970, 340],
+  Resource: [1260, 340],
+  Facility: [1530, 340],
+  Source: [535, 560],
+  Pathway: [825, 560],
+  Capability: [1260, 560],
+  County: [1530, 560],
+};
+/** Hand-routed edges that would otherwise cross the whole model. */
+const ROUTE: Record<string, [number, number][]> = {
+  lives_in: [
+    [100, 143],
+    [100, 680],
+    [1530, 680],
+    [1530, 593],
+  ],
+  step_cites: [
+    [940, 373],
+    [940, 455],
+    [595, 455],
+    [595, 527],
+  ],
+};
 
-function layout(nodes: Node[], edges: Edge[], spread: number): Layout {
-  const sim = forceSimulation(nodes)
-    .force("link", forceLink<Node, { source: string; target: string }>(edges.map((e) => ({ ...e }))).id((n) => n.key).distance(46).strength(0.6))
-    .force("charge", forceManyBody().strength(-110))
-    .force("collide", forceCollide<Node>((n) => n.size + 6))
-    .force("x", forceX<Node>((n) => LAYER_X[layerOf(n.type)] * spread).strength(0.3))
-    .force("y", forceY(0).strength(0.05))
-    .stop();
-  for (let i = 0; i < 320; i++) sim.tick();
-  const xs = nodes.map((n) => n.x ?? 0);
-  const ys = nodes.map((n) => n.y ?? 0);
-  return { nodes, edges, box: fit(xs, ys) };
-}
+type Pt = { x: number; y: number };
 
-/** Bounding box with padding and a minimum size, so small graphs are not blown up. */
-function fit(xs: number[], ys: number[]) {
-  const pad = 80;
-  const [x0, x1] = [Math.min(...xs) - pad, Math.max(...xs) + pad * 2];
-  const [y0, y1] = [Math.min(...ys) - pad, Math.max(...ys) + pad];
-  const w = Math.max(x1 - x0, 1100);
-  const h = Math.max(y1 - y0, 640);
-  return { x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h };
-}
-
-/** Curve control point: edges between non-adjacent nodes in one column bow out instead of crossing nodes. */
-function control(a: Node, b: Node) {
-  const mx = (a.x! + b.x!) / 2;
-  const my = (a.y! + b.y!) / 2;
-  const dy = Math.abs(a.y! - b.y!);
-  if (Math.abs(a.x! - b.x!) < 1 && dy > 130) return { x: mx + dy * 0.35, y: my };
-  return { x: mx, y: my };
-}
-
-/** Schema: fixed columns per layer, ordered to keep crossings low. */
-const SCHEMA_ORDER = {
-  care: ["County", "Facility", "Resource", "Capability"],
-  pathway: ["Source", "Criterion", "Symptom", "Pathway", "Step"],
-  case: ["Person", "Case", "Clock"],
-} as const;
-
-function schemaLayout(counts: Record<string, number>): Layout {
-  const nodes: Node[] = (Object.keys(SCHEMA_ORDER) as (keyof typeof SCHEMA_ORDER)[]).flatMap((layer) =>
-    SCHEMA_ORDER[layer].map((id, i, all) => ({
-      key: id,
-      type: id,
-      title: `${OBJECT_TYPES.find((t) => t.id === id)!.plural} · ${counts[id] ?? 0}`,
-      size: 18,
-      x: LAYER_X[layer],
-      y: (i - (all.length - 1) / 2) * 120,
-    })),
-  );
-  const edges: Edge[] = LINK_TYPES.filter((l) => l.from !== l.to).map((l) => ({ source: l.from, target: l.to, label: l.label }));
-  return { nodes, edges, box: fit(nodes.map((n) => n.x!), nodes.map((n) => n.y!)) };
+/** Where the line from a card's centre towards `to` leaves the card. */
+function edgePoint(c: Pt, to: Pt, w = W, h = H): Pt {
+  const dx = to.x - c.x;
+  const dy = to.y - c.y;
+  if (dx === 0 && dy === 0) return c;
+  const s = Math.min(Math.abs(w / 2 / (dx || 1e-9)), Math.abs(h / 2 / (dy || 1e-9)));
+  return { x: c.x + dx * s, y: c.y + dy * s };
 }
 
 export function OntologyView() {
   const [graph, setGraph] = useState<OntGraph | null>(null);
-  const [mode, setMode] = useState<"objects" | "schema">("objects");
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set(["Symptom"]));
-  const [selected, setSelected] = useState<string | null>(null);
-  const [hover, setHover] = useState<string | null>(null);
+  const [openType, setOpenType] = useState<string | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
-  const svgRef = useRef<SVGSVGElement>(null);
-  const drag = useRef<{ x: number; y: number } | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/ontology", { cache: "no-store" });
@@ -112,308 +92,374 @@ export function OntologyView() {
     return () => events.close();
   }, [refresh]);
 
-  const counts = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const o of graph?.objects ?? []) m[o.type] = (m[o.type] ?? 0) + 1;
+  const byKey = useMemo(() => new Map((graph?.objects ?? []).map((o) => [o.key, o])), [graph]);
+  const ofType = useMemo(() => {
+    const m: Record<string, OntObject[]> = {};
+    for (const o of graph?.objects ?? []) (m[o.type] ??= []).push(o);
     return m;
   }, [graph]);
 
-  const byKey = useMemo(() => new Map((graph?.objects ?? []).map((o) => [o.key, o])), [graph]);
+  const q = query.trim().toLowerCase();
+  const matches = q && graph ? graph.objects.filter((o) => `${o.title} ${o.subtitle ?? ""}`.toLowerCase().includes(q)).slice(0, 10) : [];
+  const focused = focus ? byKey.get(focus) : undefined;
 
-  const result = useMemo<Layout | null>(() => {
-    if (!graph) return null;
-    if (mode === "schema") {
-      return schemaLayout(counts);
-    }
-    const nodes: Node[] = graph.objects
-      .filter((o) => !hidden.has(o.type))
-      .map((o) => ({ key: o.key, type: o.type, title: o.title, size: SIZE[o.type] ?? 7 }));
-    const keep = new Set(nodes.map((n) => n.key));
-    const label = new Map<string, string>(LINK_TYPES.map((l) => [l.id, l.label]));
-    const edges: Edge[] = graph.links
-      .filter((l) => keep.has(l.from) && keep.has(l.to))
-      .map((l) => ({ source: l.from, target: l.to, label: label.get(l.type) ?? l.type }));
-    return layout(nodes, edges, 1);
-  }, [graph, mode, hidden, counts]);
-
-  const pos = useMemo(() => new Map((result?.nodes ?? []).map((n) => [n.key, n])), [result]);
-
-  const focus = hover ?? selected;
-  const neighbours = useMemo(() => {
-    const s = new Set<string>();
-    if (!focus || !result) return s;
-    s.add(focus);
-    for (const e of result.edges) {
-      if (e.source === focus) s.add(e.target);
-      if (e.target === focus) s.add(e.source);
-    }
-    return s;
-  }, [focus, result]);
-
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q || !graph) return [];
-    return graph.objects.filter((o) => `${o.title} ${o.subtitle ?? ""} ${o.type}`.toLowerCase().includes(q)).slice(0, 8);
-  }, [query, graph]);
-
-  const switchMode = (m: typeof mode) => {
-    setMode(m);
-    setSelected(null);
-    setView({ x: 0, y: 0, k: 1 });
+  const open = (k: string) => {
+    setFocus(k);
+    setOpenType(byKey.get(k)?.type ?? null);
+    setQuery("");
   };
-
-  const toggle = (type: string) =>
-    setHidden((h) => {
-      const next = new Set(h);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
-    });
-
-  const onWheel = (e: React.WheelEvent) => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const r = svg.getBoundingClientRect();
-    const px = e.clientX - r.left;
-    const py = e.clientY - r.top;
-    const k = Math.min(6, Math.max(0.3, view.k * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
-    setView({ k, x: px - ((px - view.x) * k) / view.k, y: py - ((py - view.y) * k) / view.k });
-  };
-
-  const box = result?.box;
-  const selObj = mode === "objects" && selected ? byKey.get(selected) : null;
-  const selType = mode === "schema" && selected ? OBJECT_TYPES.find((t) => t.id === selected) : null;
 
   return (
     <div className="flex min-h-0 flex-1">
-      <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-line">
-        <div className="flex border-b border-line">
-          {(["objects", "schema"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => switchMode(m)}
-              className={`h-10 flex-1 text-sm ${mode === m ? "bg-raised text-fg" : "text-muted hover:text-fg"}`}
-            >
-              {m === "objects" ? "Objects" : "Schema"}
-            </button>
-          ))}
-        </div>
+      <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-line">
         <div className="relative border-b border-line p-3">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search objects"
+            placeholder="Find a hospital, person, case…"
             className="h-9 w-full border border-line bg-base px-3 text-sm outline-none placeholder:text-dim focus:border-line-strong"
           />
           {matches.length > 0 && (
             <ul className="absolute inset-x-3 top-12 z-10 border border-line-strong bg-panel">
               {matches.map((o) => (
                 <li key={o.key}>
-                  <button
-                    onClick={() => {
-                      if (mode !== "objects") switchMode("objects");
-                      setHidden((h) => {
-                        const next = new Set(h);
-                        next.delete(o.type);
-                        return next;
-                      });
-                      setSelected(o.key);
-                      setQuery("");
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-raised"
-                  >
-                    <span className="h-2 w-2 shrink-0" style={{ background: COLOR[o.type] }} />
+                  <button onClick={() => open(o.key)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-raised">
+                    <Swatch type={o.type} />
                     <span className="truncate">{o.title}</span>
-                    <span className="ml-auto text-xs text-dim">{o.type}</span>
+                    <span className="ml-auto shrink-0 text-xs text-dim">{objectType(o.type)?.label}</span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
         </div>
-        {(["care", "pathway", "case"] as const).map((layer) => (
+        <button
+          onClick={() => {
+            setFocus(null);
+            setOpenType(null);
+          }}
+          className={`flex h-10 items-center gap-3 border-b border-line px-4 text-left text-sm ${!focus ? "bg-raised text-fg" : "text-muted hover:text-fg"}`}
+        >
+          Whole model
+        </button>
+        {(["case", "care", "pathway"] as const).map((layer) => (
           <div key={layer} className="border-b border-line py-2">
             <p className="label px-4 py-1.5">{LAYER_LABEL[layer]}</p>
-            {OBJECT_TYPES.filter((t) => t.layer === layer).map((t) => {
-              const off = mode === "objects" && hidden.has(t.id);
-              return (
+            {OBJECT_TYPES.filter((t) => t.layer === layer).map((t) => (
+              <div key={t.id}>
                 <button
-                  key={t.id}
-                  onClick={() => (mode === "objects" ? toggle(t.id) : setSelected(t.id))}
+                  onClick={() => setOpenType(openType === t.id ? null : t.id)}
                   title={t.description}
-                  className={`flex w-full items-center gap-3 px-4 py-1.5 text-left text-sm hover:bg-raised ${off ? "text-dim" : ""}`}
+                  className={`flex w-full items-center gap-3 px-4 py-1.5 text-left text-sm hover:bg-raised ${openType === t.id ? "text-fg" : ""}`}
                 >
-                  <span className="h-2.5 w-2.5 shrink-0" style={{ background: off ? "transparent" : COLOR[t.id], border: `1px solid ${COLOR[t.id]}` }} />
+                  <Swatch type={t.id} />
                   {t.plural}
-                  <span className="ml-auto font-mono text-xs text-muted">{counts[t.id] ?? 0}</span>
+                  <span className="ml-auto font-mono text-xs text-muted">{ofType[t.id]?.length ?? 0}</span>
                 </button>
-              );
-            })}
+                {openType === t.id && (
+                  <ul className="mb-1 max-h-64 overflow-y-auto border-y border-line bg-base">
+                    {(ofType[t.id] ?? []).map((o) => (
+                      <li key={o.key}>
+                        <button
+                          onClick={() => setFocus(o.key)}
+                          className={`block w-full truncate py-1.5 pr-4 pl-10 text-left text-sm ${focus === o.key ? "bg-raised text-fg" : "text-muted hover:text-fg"}`}
+                        >
+                          {o.title}
+                          {o.subtitle && <span className="text-dim"> · {o.subtitle}</span>}
+                        </button>
+                      </li>
+                    ))}
+                    {(ofType[t.id] ?? []).length === 0 && <li className="py-1.5 pl-10 text-sm text-dim">None yet</li>}
+                  </ul>
+                )}
+              </div>
+            ))}
           </div>
         ))}
         <p className="mt-auto p-4 text-xs leading-relaxed text-dim">
-          {mode === "objects" ? "Click a type to show or hide it. Scroll to zoom, drag to pan." : `${OBJECT_TYPES.length} object types, ${LINK_TYPES.length} link types.`}
+          {OBJECT_TYPES.length} object types, {LINK_TYPES.length} link types. Bright arrows: what creates what.
         </p>
       </aside>
 
-      <div className="relative min-w-0 flex-1 bg-base">
-        {box && result && (
-          <svg
-            ref={svgRef}
-            className="h-full w-full cursor-grab select-none active:cursor-grabbing"
-            onWheel={onWheel}
-            onMouseDown={(e) => (drag.current = { x: e.clientX - view.x, y: e.clientY - view.y })}
-            onMouseMove={(e) => drag.current && setView({ ...view, x: e.clientX - drag.current.x, y: e.clientY - drag.current.y })}
-            onMouseUp={() => (drag.current = null)}
-            onMouseLeave={() => (drag.current = null)}
-            onClick={(e) => e.target === e.currentTarget && setSelected(null)}
-          >
-            <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
-              <svg viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`} overflow="visible" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">
-                {(Object.keys(LAYER_X) as (keyof typeof LAYER_X)[]).map((l) => (
-                    <text key={l} x={LAYER_X[l]} y={box.y + 30} textAnchor="middle" className="fill-dim font-mono text-[13px] uppercase tracking-widest">
-                      {LAYER_LABEL[l]}
-                    </text>
-                  ))}
-                {result.edges.map((e, i) => {
-                  const a = pos.get(e.source);
-                  const b = pos.get(e.target);
-                  if (!a || !b) return null;
-                  const lit = focus !== null && (e.source === focus || e.target === focus);
-                  const showLabel = mode === "schema" || lit;
-                  const c = control(a, b);
-                  return (
-                    <g key={i}>
-                      <path
-                        d={`M ${a.x} ${a.y} Q ${c.x} ${c.y} ${b.x} ${b.y}`}
-                        fill="none"
-                        stroke={lit ? "#e6e6e3" : "#3a3f41"}
-                        strokeOpacity={focus && !lit ? 0.25 : 0.9}
-                        strokeWidth={lit ? 1.4 : 0.8}
-                      />
-                      {showLabel && (
-                        <text x={(a.x! + 2 * c.x + b.x!) / 4} y={(a.y! + 2 * c.y + b.y!) / 4 - 4} textAnchor="middle" className="fill-muted text-[10px]">
-                          {e.label}
-                        </text>
-                      )}
-                    </g>
-                  );
-                })}
-                {result.nodes.map((n) => {
-                  const dimmed = focus !== null && !neighbours.has(n.key);
-                  const isSel = selected === n.key;
-                  const showLabel = mode === "schema" || ALWAYS_LABEL.has(n.type) || neighbours.has(n.key);
-                  return (
-                    <g
-                      key={n.key}
-                      transform={`translate(${n.x} ${n.y})`}
-                      opacity={dimmed ? 0.2 : 1}
-                      className="cursor-pointer"
-                      onMouseEnter={() => setHover(n.key)}
-                      onMouseLeave={() => setHover(null)}
-                      onClick={() => setSelected(n.key)}
-                    >
-                      <rect
-                        x={-n.size / 2}
-                        y={-n.size / 2}
-                        width={n.size}
-                        height={n.size}
-                        fill={COLOR[n.type]}
-                        stroke={isSel ? "#ffffff" : "#0a0b0b"}
-                        strokeWidth={isSel ? 2 : 1}
-                      />
-                      {showLabel && (
-                        <text x={n.size / 2 + 5} y={4} className="fill-fg text-[11px]" style={{ paintOrder: "stroke", stroke: "#0a0b0b", strokeWidth: 3 }}>
-                          {n.title.length > 34 ? `${n.title.slice(0, 33)}…` : n.title}
-                        </text>
-                      )}
-                    </g>
-                  );
-                })}
-              </svg>
-            </g>
-          </svg>
-        )}
+      <div className="relative min-w-0 flex-1 overflow-auto bg-base">
         {!graph && <p className="p-6 text-sm text-muted">Loading ontology…</p>}
-        <div className="pointer-events-none absolute bottom-4 left-4 flex gap-4 text-xs text-muted">
-          <span>{graph?.objects.length ?? 0} objects</span>
-          <span>{graph?.links.length ?? 0} links</span>
-        </div>
+        {graph && !focused && <ModelGraph ofType={ofType} onType={(t) => setOpenType(t)} />}
+        {graph && focused && <ObjectGraph o={focused} graph={graph} byKey={byKey} onOpen={open} />}
       </div>
 
-      {(selObj || selType) && (
-        <aside className="w-96 shrink-0 overflow-y-auto border-l border-line bg-panel">
-          {selObj && <ObjectPanel o={selObj} graph={graph!} byKey={byKey} onSelect={setSelected} />}
-          {selType && (
-            <div className="p-6">
-              <p className="label">Object type</p>
-              <h2 className="mt-2 text-lg">{selType.label}</h2>
-              <p className="mt-2 text-sm text-muted">{selType.description}</p>
-              <p className="label mt-6">Links</p>
-              <ul className="mt-2 border-t border-line text-sm">
-                {LINK_TYPES.filter((l) => l.from === selType.id || l.to === selType.id).map((l) => (
-                  <li key={l.id} className="border-b border-line py-2">
-                    {l.from} <span className="text-muted">{l.label}</span> {l.to}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-4 text-sm text-muted">{counts[selType.id] ?? 0} objects</p>
-            </div>
-          )}
+      {focused && (
+        <aside className="w-88 shrink-0 overflow-y-auto border-l border-line bg-panel">
+          <ObjectDetails o={focused} />
         </aside>
       )}
     </div>
   );
 }
 
-function ObjectPanel({
+function Swatch({ type }: { type: string }) {
+  return <span className="h-2.5 w-2.5 shrink-0" style={{ background: COLOR[type] }} />;
+}
+
+function Markers() {
+  return (
+    <defs>
+      {[
+        ["arrow-create", "#e6e6e3"],
+        ["arrow-relate", "#5b6062"],
+      ].map(([id, fill]) => (
+        <marker key={id} id={id} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill={fill} />
+        </marker>
+      ))}
+    </defs>
+  );
+}
+
+function Edge({ pts, kind, label, sub }: { pts: Pt[]; kind: "creates" | "relates"; label: string; sub?: string }) {
+  const creates = kind === "creates";
+  const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  // Label on the middle segment.
+  const i = Math.floor((pts.length - 1) / 2);
+  const mx = (pts[i].x + pts[i + 1].x) / 2;
+  const my = (pts[i].y + pts[i + 1].y) / 2;
+  const horizontal = Math.abs(pts[i].y - pts[i + 1].y) < 1;
+  return (
+    <g>
+      <path
+        d={d}
+        fill="none"
+        stroke={creates ? "#e6e6e3" : "#4a5052"}
+        strokeWidth={creates ? 1.8 : 1}
+        markerEnd={`url(#arrow-${creates ? "create" : "relate"})`}
+      />
+      <text
+        x={mx + (horizontal ? 0 : 8)}
+        y={my + (horizontal ? -8 : 4)}
+        textAnchor={horizontal ? "middle" : "start"}
+        className={creates ? "fill-fg text-[12px] font-medium" : "fill-muted text-[11px]"}
+        style={{ paintOrder: "stroke", stroke: "#0a0b0b", strokeWidth: 4 }}
+      >
+        {label}
+      </text>
+      {sub && (
+        <text
+          x={mx + (horizontal ? 0 : 8)}
+          y={my + (horizontal ? 14 : 18)}
+          textAnchor={horizontal ? "middle" : "start"}
+          className="fill-dim text-[10px]"
+          style={{ paintOrder: "stroke", stroke: "#0a0b0b", strokeWidth: 4 }}
+        >
+          {sub}
+        </text>
+      )}
+    </g>
+  );
+}
+
+function Card({
+  x,
+  y,
+  type,
+  title,
+  lines,
+  onClick,
+  strong,
+}: {
+  x: number;
+  y: number;
+  type: string;
+  title: string;
+  lines: string[];
+  onClick?: () => void;
+  strong?: boolean;
+}) {
+  return (
+    <g transform={`translate(${x - W / 2} ${y - H / 2})`} onClick={onClick} className={onClick ? "cursor-pointer" : ""}>
+      <rect width={W} height={H} fill={strong ? "#1b1e1f" : "#121414"} stroke={strong ? "#e6e6e3" : "#3a3f41"} />
+      <rect width={4} height={H} fill={COLOR[type]} />
+      <text x={16} y={22} className="fill-muted font-mono text-[10px] uppercase tracking-wider">
+        {objectType(type)?.label ?? type}
+      </text>
+      <text x={16} y={42} className="fill-fg text-[14px]">
+        {title.length > 21 ? `${title.slice(0, 20)}…` : title}
+      </text>
+      {lines[0] && (
+        <text x={16} y={58} className="fill-dim text-[11px]">
+          {lines[0].length > 27 ? `${lines[0].slice(0, 26)}…` : lines[0]}
+        </text>
+      )}
+    </g>
+  );
+}
+
+function ModelGraph({ ofType, onType }: { ofType: Record<string, OntObject[]>; onType: (t: string) => void }) {
+  const at = (t: string): Pt => ({ x: MODEL_POS[t][0], y: MODEL_POS[t][1] });
+  return (
+    <svg viewBox="-10 30 1650 680" className="h-full min-h-[560px] w-full min-w-[900px]">
+      <Markers />
+      <text x={100 - W / 2} y={58} className="fill-dim font-mono text-[11px] uppercase tracking-widest">
+        Patient journey: each object creates the next
+      </text>
+      {LINKS.filter((l) => l.from !== l.to).map((l) => {
+        const route = ROUTE[l.id];
+        const a = at(l.from);
+        const b = at(l.to);
+        const pts = route ? route.map(([x, y]) => ({ x, y })) : [edgePoint(a, b), edgePoint(b, a)];
+        return (
+          <Edge
+            key={l.id}
+            pts={pts}
+            kind={l.kind}
+            label={l.kind === "creates" ? (l.action ?? l.label) : l.label}
+            sub={l.kind === "creates" ? l.actor : undefined}
+          />
+        );
+      })}
+      {OBJECT_TYPES.map((t) => {
+        const objs = ofType[t.id] ?? [];
+        const sample = objs
+          .slice(0, 2)
+          .map((o) => o.title)
+          .join(", ");
+        return (
+          <Card
+            key={t.id}
+            x={MODEL_POS[t.id][0]}
+            y={MODEL_POS[t.id][1]}
+            type={t.id}
+            title={`${t.plural} · ${objs.length}`}
+            lines={[objs.length > 2 ? `${sample} +${objs.length - 2}` : sample || "None yet"]}
+            onClick={() => onType(t.id)}
+            strong={LINK_TYPES.some((l) => l.kind === "creates" && (l.from === t.id || l.to === t.id))}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+const MAX_PER_GROUP = 6;
+
+function ObjectGraph({
   o,
   graph,
   byKey,
-  onSelect,
+  onOpen,
 }: {
   o: OntObject;
   graph: OntGraph;
   byKey: Map<string, OntObject>;
-  onSelect: (key: string) => void;
+  onOpen: (k: string) => void;
 }) {
-  const label = new Map<string, string>(LINK_TYPES.map((l) => [l.id, l.label]));
-  const out = graph.links.filter((l) => l.from === o.key);
-  const inc = graph.links.filter((l) => l.to === o.key);
-  const prov = PROVENANCE[o.provenance];
-  const props = Object.entries(o.props).filter(([, v]) => v !== null && v !== "");
+  type Group = { linkId: string; items: OntObject[]; more: number };
+  const groups = (dir: "in" | "out"): Group[] => {
+    const by = new Map<string, OntObject[]>();
+    for (const l of graph.links) {
+      const other = dir === "in" ? (l.to === o.key ? l.from : null) : l.from === o.key ? l.to : null;
+      const obj = other ? byKey.get(other) : undefined;
+      if (obj) by.set(l.type, [...(by.get(l.type) ?? []), obj]);
+    }
+    return [...by].map(([linkId, items]) => ({ linkId, items: items.slice(0, MAX_PER_GROUP), more: Math.max(0, items.length - MAX_PER_GROUP) }));
+  };
+  const inGroups = groups("in");
+  const outGroups = groups("out");
 
-  const row = (type: string, other: string, dir: "out" | "in") => {
-    const t = byKey.get(other);
-    if (!t) return null;
-    return (
-      <li key={`${dir}-${type}-${other}`} className="border-b border-line">
-        <button onClick={() => onSelect(other)} className="flex w-full items-center gap-2 py-2 text-left text-sm hover:bg-raised">
-          <span className="w-24 shrink-0 text-muted">{dir === "out" ? label.get(type) : `← ${label.get(type)}`}</span>
-          <span className="h-2 w-2 shrink-0" style={{ background: COLOR[t.type] }} />
-          <span className="truncate">{t.title}</span>
-          <span className="ml-auto shrink-0 text-xs text-dim">{t.type}</span>
-        </button>
-      </li>
-    );
+  const ROW = 84;
+  const GAP = 36;
+  const place = (gs: Group[]) => {
+    let y = 0;
+    return gs.map((g) => {
+      const top = y;
+      y += g.items.length * ROW + (g.more ? 24 : 0) + GAP;
+      return { ...g, top };
+    });
+  };
+  const left = place(inGroups);
+  const right = place(outGroups);
+  const height = (gs: ReturnType<typeof place>) => (gs.length ? gs[gs.length - 1].top + gs[gs.length - 1].items.length * ROW + 40 : 0);
+  const total = Math.max(height(left), height(right), 300) + 80;
+  const cx = 600;
+  const cy = total / 2;
+  const LX = 140;
+  const RX = 1060;
+  const offset = (gs: ReturnType<typeof place>) => (total - height(gs)) / 2 + 20;
+
+  const side = (gs: ReturnType<typeof place>, x: number, dir: "in" | "out") => {
+    const off = offset(gs);
+    return gs.map((g) => {
+      const lt = linkType(g.linkId);
+      const kind = lt?.kind ?? "relates";
+      return (
+        <g key={`${dir}-${g.linkId}`}>
+          {g.items.map((item, i) => {
+            const y = off + g.top + i * ROW + H / 2 + 14;
+            const from = dir === "in" ? { x: x + W / 2, y } : edgePoint({ x: cx, y: cy }, { x, y }, W + 40, H + 40);
+            const to = dir === "in" ? edgePoint({ x: cx, y: cy }, { x, y }, W + 40, H + 40) : { x: x - W / 2, y };
+            return (
+              <g key={item.key}>
+                <Edge pts={[from, to]} kind={kind} label={i === 0 ? (kind === "creates" ? (lt?.action ?? g.linkId) : (lt?.label ?? g.linkId)) : ""} />
+                <Card x={x} y={y} type={item.type} title={item.title} lines={[item.subtitle ?? ""]} onClick={() => onOpen(item.key)} />
+              </g>
+            );
+          })}
+          {g.more > 0 && (
+            <text x={x - W / 2} y={off + g.top + g.items.length * ROW + 20} className="fill-dim text-[11px]">
+              +{g.more} more
+            </text>
+          )}
+        </g>
+      );
+    });
   };
 
   return (
+    <svg viewBox={`-20 0 1240 ${total}`} className="w-full min-w-[900px]" style={{ height: Math.max(total * 0.75, 560) }}>
+      <Markers />
+      <text x={LX - W / 2} y={28} className="fill-dim font-mono text-[11px] uppercase tracking-widest">
+        Points to {o.title.length > 20 ? "this" : o.title}
+      </text>
+      <text x={RX - W / 2} y={28} className="fill-dim font-mono text-[11px] uppercase tracking-widest">
+        {o.title.length > 20 ? "This" : o.title} points to
+      </text>
+      {side(left, LX, "in")}
+      {side(right, RX, "out")}
+      <g transform={`translate(${cx - (W + 40) / 2} ${cy - (H + 40) / 2})`}>
+        <rect width={W + 40} height={H + 40} fill="#1b1e1f" stroke="#e6e6e3" strokeWidth={1.5} />
+        <rect width={5} height={H + 40} fill={COLOR[o.type]} />
+        <text x={20} y={28} className="fill-muted font-mono text-[11px] uppercase tracking-wider">
+          {objectType(o.type)?.label}
+        </text>
+        <text x={20} y={56} className="fill-fg text-[18px]">
+          {o.title.length > 22 ? `${o.title.slice(0, 21)}…` : o.title}
+        </text>
+        {o.subtitle && (
+          <text x={20} y={80} className="fill-muted text-[12px]">
+            {o.subtitle.length > 32 ? `${o.subtitle.slice(0, 31)}…` : o.subtitle}
+          </text>
+        )}
+      </g>
+    </svg>
+  );
+}
+
+function ObjectDetails({ o }: { o: OntObject }) {
+  const prov = PROVENANCE[o.provenance];
+  const props = Object.entries(o.props).filter(([, v]) => v !== null && v !== "");
+  return (
     <div className="p-6">
       <div className="flex items-center gap-2">
-        <span className="h-2.5 w-2.5" style={{ background: COLOR[o.type] }} />
-        <p className="label">{o.type}</p>
+        <Swatch type={o.type} />
+        <p className="label">{objectType(o.type)?.label}</p>
         <span className={`ml-auto border px-2 py-0.5 text-[11px] ${prov.cls}`}>{prov.label}</span>
       </div>
       <h2 className="mt-3 text-lg leading-snug">{o.title}</h2>
       {o.subtitle && <p className="mt-1 text-sm text-muted">{o.subtitle}</p>}
-
       {props.length > 0 && (
         <dl className="mt-6 border-t border-line text-sm">
           {props.map(([k, v]) => (
             <div key={k} className="flex gap-4 border-b border-line py-2">
               <dt className="w-24 shrink-0 text-muted">{k}</dt>
-              <dd className="min-w-0 break-words">{String(v)}</dd>
+              <dd className="min-w-0 break-words">{typeof v === "boolean" ? (v ? "yes" : "no") : String(v)}</dd>
             </div>
           ))}
         </dl>
@@ -423,12 +469,6 @@ function ObjectPanel({
           Source: {o.sourceUrl.replace(/^https?:\/\//, "")}
         </a>
       )}
-
-      <p className="label mt-8">Links · {out.length + inc.length}</p>
-      <ul className="mt-2 border-t border-line">
-        {out.map((l) => row(l.type, l.to, "out"))}
-        {inc.map((l) => row(l.type, l.from, "in"))}
-      </ul>
     </div>
   );
 }

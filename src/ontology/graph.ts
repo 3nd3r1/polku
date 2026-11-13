@@ -1,4 +1,5 @@
 import { lung } from "../pathways/lung";
+import type { CallView } from "../server/calls";
 import type { CaseView } from "../server/cases";
 import type { Person } from "../sim/people";
 import { key, type OntGraph, type OntLink, type OntObject } from "./meta";
@@ -7,9 +8,10 @@ import { SymptomCode } from "./schema";
 import { CAPABILITIES, capabilityName, COUNTIES, countyByName, FACILITIES, facility, RESOURCES } from "./world";
 
 const WEEKDAY = ["", "Mon", "Tue", "Wed", "Thu", "Fri"];
+const stamp = (iso: string) => new Date(iso).toLocaleString("sv-SE", { timeZone: "Europe/Helsinki" }).slice(0, 16);
 
 /** Builds the instance graph from the care data, the pathway definition and live cases. */
-export function buildGraph(people: readonly Person[], cases: CaseView[]): OntGraph {
+export function buildGraph(people: readonly Person[], calls: CallView[], cases: CaseView[]): OntGraph {
   const objects: OntObject[] = [];
   const links: OntLink[] = [];
   const link = (type: string, from: string, to: string) => links.push({ type, from, to });
@@ -36,8 +38,8 @@ export function buildGraph(people: readonly Person[], cases: CaseView[]): OntGra
     objects.push({
       key: k,
       type: "Resource",
-      title: r.name,
-      subtitle: facility(r.facilityId).name,
+      title: `${r.name}`,
+      subtitle: `${facility(r.facilityId).name} · first free in ${r.leadDays} d`,
       provenance: "synthetic",
       props: {
         sessions: `${r.weekdays.map((d) => WEEKDAY[d]).join(" ")} · ${r.times.join(", ")}`,
@@ -101,9 +103,21 @@ export function buildGraph(people: readonly Person[], cases: CaseView[]): OntGra
 
   for (const person of people) {
     const k = key("Person", person.id);
-    objects.push({ key: k, type: "Person", title: person.name, subtitle: person.county, provenance: "synthetic", props: { born: person.birthYear } });
+    objects.push({ key: k, type: "Person", title: person.name, subtitle: person.county, provenance: "synthetic", props: { born: person.birthYear, phone: person.phone } });
     const county = countyByName(person.county);
     if (county) link("lives_in", k, key("County", county.id));
+  }
+  for (const call of calls) {
+    const k = key("Call", call.id);
+    objects.push({
+      key: k,
+      type: "Call",
+      title: `Call ${stamp(call.startedAt)}`,
+      subtitle: call.person?.name ?? "Not identified",
+      provenance: "synthetic",
+      props: { status: call.status, started: stamp(call.startedAt), identified: call.verifiedAt ? stamp(call.verifiedAt) : null, turns: call.transcript.length },
+    });
+    if (call.person) link("places", key("Person", call.person.id), k);
   }
   for (const c of cases) {
     const k = key("Case", c.id);
@@ -113,9 +127,9 @@ export function buildGraph(people: readonly Person[], cases: CaseView[]): OntGra
       title: c.person?.name ?? "Unidentified caller",
       subtitle: c.status.replace("_", " "),
       provenance: "synthetic",
-      props: { outcome: c.outcome.replace("_", " "), status: c.status.replace("_", " "), opened: c.createdAt.slice(0, 16).replace("T", " ") },
+      props: { outcome: c.outcome.replace("_", " "), status: c.status.replace("_", " "), opened: stamp(c.createdAt), county: c.county },
     });
-    if (c.person) link("case_of", k, key("Person", c.person.id));
+    if (c.callId && calls.some((x) => x.id === c.callId)) link("opens", key("Call", c.callId), k);
     for (const m of new Set(c.matches.map((x) => x.criterionId))) link("matched", k, key("Criterion", m));
     c.clocks.forEach((clock, i) => {
       const ck = key("Clock", `${c.id}-${i}`);
@@ -123,17 +137,28 @@ export function buildGraph(people: readonly Person[], cases: CaseView[]): OntGra
       objects.push({
         key: ck,
         type: "Clock",
-        title: step?.name ?? clock.stepId,
-        subtitle: clock.stoppedAt ? "stopped" : "running",
+        title: `${step?.name ?? clock.stepId}`,
+        subtitle: `${c.person?.name ?? "Case"} · ${clock.stoppedAt ? "stopped" : "running"}`,
         provenance: "synthetic",
-        props: { started: clock.startedAt.slice(0, 16).replace("T", " "), due: clock.dueAt.slice(0, 16).replace("T", " "), booked: clock.scheduledAt?.slice(0, 16).replace("T", " ") ?? null },
+        props: { started: stamp(clock.startedAt), due: stamp(clock.dueAt), stopped: clock.stoppedAt ? stamp(clock.stoppedAt) : null },
       });
-      link("clock_of", ck, k);
+      link("starts", k, ck);
       link("times", ck, key("Step", clock.stepId));
+      if (!clock.scheduledAt) return;
+      const ak = key("Appointment", `${c.id}-${i}`);
       const resource = RESOURCES.find(
-        (r) => step && "requires" in step && r.capabilityId === step.requires && facility(r.facilityId).name === clock.unit,
+        (r) => step && "requires" in step && r.capabilityId === step.requires && clock.unit?.startsWith(facility(r.facilityId).name),
       );
-      if (clock.unit && resource) link("booked_on", ck, key("Resource", resource.id));
+      objects.push({
+        key: ak,
+        type: "Appointment",
+        title: `${resource?.name ?? step?.name ?? "Appointment"} ${stamp(clock.scheduledAt)}`,
+        subtitle: `${c.person?.name ?? "Case"} · ${clock.unit ?? ""}`,
+        provenance: "synthetic",
+        props: { at: stamp(clock.scheduledAt), where: clock.unit, due: stamp(clock.dueAt), "within target": clock.scheduledAt <= clock.dueAt },
+      });
+      link("books", ck, ak);
+      if (resource) link("on", ak, key("Resource", resource.id));
     });
   }
   return { objects, links };
