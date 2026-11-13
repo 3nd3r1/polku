@@ -71,3 +71,27 @@ Rules engine + ontology ── Aiven PostgreSQL ┘
 - **Cloudinary:** separate form (skipped anyway)
 - **Codex:** keep evidence (screenshots, commit notes) of real Codex usage
 - **CRACI:** the CI badge or run link in the README
+
+## Verda plan (priority side prize)
+
+**What Verda asks for:** use Verda to build something you couldn't build on a laptop. Judged on:
+- an ambitious idea where compute makes it possible
+- the right Verda product with a clear reason for choosing it
+- the path from idea to prototype
+- bonus: how it scales to real users
+
+**Must do:** document the process and post a summary link in Verda's Discord channel. Their brief literally suggests "keep sensitive data in Europe, run open-weight models on infrastructure you control".
+
+**Prize:** 1st $10 000 credits + hoodies, 2nd and 3rd $2 500 credits.
+
+Three jobs, each with a different Verda product and a reason:
+
+| Job | Verda product | Why this product | Priority |
+|---|---|---|---|
+| Sovereign voice-agent brain: Gemma behind an OpenAI-compatible endpoint, plugged into ElevenLabs as the custom LLM | GPU instance (vLLM), or the Inference API if it serves Gemma | Personal health data must stay in the EU on infra we control. A real-time call needs GPU latency. | Must (spike S3) |
+| County "what-if" simulator: Monte Carlo of synthetic patient flows, 21 counties × pathway steps × intervention scenarios | Batch jobs | Thousands of scenario runs behind the cockpit's "this change saves N days" claim. Too slow on a laptop, perfect as batch. | Should |
+| Better Finnish extraction: LoRA fine-tune of Gemma on synthetic Finnish symptom descriptions, measured before/after with the eval suite | GPU instance | Shows measurable improvement from compute. Also strengthens the Gemma prize. | Stretch |
+
+**Scale story (bonus points):** one auto-scaling container per county, an EU-only footprint, all on renewable energy.
+
+**Process log:** keep `docs/verda-log.md` as we go (what we tried, latency numbers, what broke, cost). It becomes the Discord post.
