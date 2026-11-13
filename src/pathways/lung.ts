@@ -143,6 +143,7 @@ export const lung = {
       clockStop: "Decision on well-founded suspicion",
       maxDays: 10,
       sourceId: "SE-SVF",
+      requires: "ct",
       note: "1 + 5 + 1 + 3 days (referral, X-ray/CT, report, decision)",
     },
     {
@@ -152,6 +153,7 @@ export const lung = {
       clockStop: "Referral received and assessed",
       maxDays: 2,
       sourceId: "SE-SVF",
+      requires: "referral_review",
     },
     {
       id: "first_visit",
@@ -160,6 +162,7 @@ export const lung = {
       clockStop: "First visit",
       maxDays: 5,
       sourceId: "SE-SVF",
+      requires: "pulmonology",
     },
     {
       id: "diagnostics",
@@ -168,6 +171,7 @@ export const lung = {
       clockStop: "First MDT meeting",
       maxDays: 21,
       sourceId: "SE-SVF",
+      requires: "bronchoscopy",
     },
     {
       id: "mdt_decision",
@@ -176,6 +180,7 @@ export const lung = {
       clockStop: "Treatment decision",
       maxDays: 2,
       sourceId: "SE-SVF",
+      requires: "tumour_board",
     },
     {
       id: "treatment_start",
@@ -184,6 +189,7 @@ export const lung = {
       clockStop: "First treatment",
       maxDays: 14,
       sourceId: "SE-SVF",
+      requires: "treatment",
       note: "Surgery and radiotherapy 14 days; drug treatment 10 days.",
     },
   ],

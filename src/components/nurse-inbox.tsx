@@ -258,7 +258,7 @@ function Booking({ c, clock }: { c: CaseView; clock: ClockView }) {
   return (
     <Panel title={`Next: book ${s.name.toLowerCase()}`}>
       <p className="text-sm text-muted">
-        Target {s.maxDays} days, due {fullDate(clock.dueAt)}. Free slots at {slots[0]?.unit} (synthetic availability):
+        Target {s.maxDays} days, due {fullDate(clock.dueAt)}. Free slots at {slots[0]?.resource}, {slots[0]?.unit} (synthetic availability):
       </p>
       <ul className="mt-4 flex flex-col border-t border-line">
         {slots.map((slot) => {

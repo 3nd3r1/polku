@@ -99,6 +99,8 @@ export type Step = {
   clockStop: string;
   maxDays: number;
   sourceId: string;
+  /** Capability (world.ts) a booking for this step needs. None = no appointment. */
+  requires?: string;
   note?: string;
 };
 
