@@ -15,7 +15,10 @@ export const calls = pgTable("calls", {
   /** Set by strong identification. Synthetic in the demo. */
   person: jsonb("person").$type<Person>(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  transcript: jsonb("transcript").$type<TranscriptLine[]>().notNull().default([]),
 });
+
+export type TranscriptLine = { role: "agent" | "caller"; text: string; at: string };
 
 /** A caller's intake and where it sits in the pathway. */
 export const cases = pgTable("cases", {
@@ -32,6 +35,8 @@ export const cases = pgTable("cases", {
   /** Matched criteria, most severe first, linked to the observation that met each. */
   matches: jsonb("matches").$type<{ criterionId: string; observationIndex: number }[]>().notNull(),
   status: text("status", { enum: CASE_STATUSES }).notNull(),
+  /** The nurse's notes from the callback. */
+  notes: text("notes"),
 });
 
 /** One clock per pathway step. Open while stoppedAt is null. */
@@ -44,6 +49,9 @@ export const clocks = pgTable("clocks", {
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+  /** Booked appointment for this step, if any. */
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  unit: text("unit"),
 });
 
 /** Every action, who did it, when. Append-only. */
