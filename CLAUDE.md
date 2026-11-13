@@ -8,6 +8,7 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 
 | Doc | What |
 |---|---|
+| `docs/18-phone-first.md` | **Phone first (the moat):** patients are mostly old, so the only patient interface is a phone call with strong identification. Staff screens: Screening, Nurse, Cockpit |
 | `docs/17-build-plan.md` | **Source of truth for what to build**: MVP scope, architecture, spikes, validation, timeline, video, landing page |
 | `docs/16-pitch.md` | The product pitch (story, insight, three surfaces, sovereign ontology, close) |
 | `docs/13-lung-pathway-sources.md` | Lung criteria (SE/DK/NO), step time limits, symptom-code vocabulary, public data sources. **Encode `src/pathways/lung.ts` from this.** |
@@ -19,6 +20,7 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 
 ## Hard rules
 
+- **Patients only ever use a phone.** No patient app, form or screen. Every screen we build is for staff (screening, nurse, county).
 - **All code must be written during the event** (from Fri 13.11 16:00). No pasting from older personal projects.
 - The repo is public and **MIT licensed**. Never commit API keys, `.env`, or partner credentials.
 - **Synthetic data only.** No real patient data. Label synthetic vs real public numbers everywhere in the UI.

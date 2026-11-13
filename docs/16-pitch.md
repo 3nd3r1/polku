@@ -19,7 +19,7 @@ Polku solves both. It runs the pathway, and the measurement falls out as a by-pr
 
 ## The product: three surfaces, one ontology
 
-**1. Front door (patient).** Matti calls a number or opens a chat, in Finnish, any time, and describes what's going on in his own words. Polku turns that into structured symptoms, each linked to the exact words he used. A rules engine checks them against published pathway criteria. The answer is never a diagnosis. It's a next step: "Your symptoms match the criteria for a fast-track assessment. A nurse will call you by Wednesday."
+**1. Front door (patient): a phone call, nothing else.** Most cancer patients are old, and the best interface for them is the phone they already have. Matti calls a number, in Finnish, any time. He is strongly identified on the call and describes what's going on in his own words. No app, no form, no screen (see `18-phone-first.md`). Polku turns that into structured symptoms, each linked to the exact words he used. A rules engine checks them against published pathway criteria. The answer is never a diagnosis. It's a next step: "Your symptoms match the criteria for a fast-track assessment. A nurse will call you by Wednesday."
 
 **2. Nurse console.** The nurse sees a structured case: the symptoms, the matched criterion and its source, and the deadline. They confirm or dismiss it, log the callback, and the pathway clock starts. A human makes every clinical decision.
 
