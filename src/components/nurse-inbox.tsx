@@ -10,8 +10,11 @@ import { clockTime, dayAndTime, formatSpan, useNow } from "./time";
 const isNurseCase = (c: CaseView) => c.outcome === "fast_track" && c.status !== "dismissed";
 const openClock = (c: CaseView) => c.clocks.find((k) => k.stoppedAt === null);
 const stepName = (id: string) => lung.steps.find((s) => s.id === id)?.name ?? id;
-const who = (c: CaseView) =>
-  `${c.intake.age !== undefined ? `${c.intake.age} y` : "Age unknown"} · ${SMOKING_LABEL[c.intake.smoking]}`;
+const who = (c: CaseView) => c.person?.name ?? "Unverified caller";
+const facts = (c: CaseView) =>
+  [c.intake.age !== undefined ? `${c.intake.age} y` : "age unknown", c.person?.county, SMOKING_LABEL[c.intake.smoking]]
+    .filter(Boolean)
+    .join(" · ");
 
 export function NurseInbox() {
   const [cases, setCases] = useState<CaseView[] | null>(null);
@@ -43,7 +46,7 @@ export function NurseInbox() {
     <div className="flex min-h-0 flex-1">
       <aside className="w-80 shrink-0 overflow-y-auto border-r border-line">
         <p className="label border-b border-line px-5 py-3">Callbacks · {cases?.length ?? 0}</p>
-        {cases?.length === 0 && <p className="p-5 text-sm text-muted">No cases. Make a call from the Patient tab.</p>}
+        {cases?.length === 0 && <p className="p-5 text-sm text-muted">No callbacks waiting.</p>}
         {cases?.map((c) => {
           const k = openClock(c);
           const left = k && now !== null ? new Date(k.dueAt).getTime() - now : null;
@@ -87,7 +90,11 @@ function CaseDetail({ c, now, onAction }: { c: CaseView; now: number | null; onA
     <div className="mx-auto flex max-w-3xl flex-col gap-10 px-8 py-10">
       <header>
         <h1 className="text-3xl font-light">{who(c)}</h1>
-        <p className="mt-1 text-sm text-dim">Called {dayAndTime(c.createdAt)}</p>
+        <p className="mt-1 text-muted">{facts(c)}</p>
+        <p className="mt-1 text-sm text-dim">
+          Called {dayAndTime(c.createdAt)}
+          {c.person && ` · ${c.person.phone} · identity verified (simulated)`}
+        </p>
       </header>
 
       <section>

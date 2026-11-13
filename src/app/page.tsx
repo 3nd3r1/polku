@@ -1,5 +1,5 @@
-import { CallScreen } from "@/components/call-screen";
+import { Screening } from "@/components/screening";
 
-export default function PatientPage() {
-  return <CallScreen />;
+export default function ScreeningPage() {
+  return <Screening />;
 }
