@@ -5,7 +5,35 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  --color-base: #0a0b0b;
+  --color-panel: #121414;
+  --color-raised: #1b1e1f;
+  --color-line: #262a2b;
+  --color-line-strong: #3a3f41;
+  --color-fg: #e6e6e3;
+  --color-muted: #8d9294;
+  --color-dim: #5b6062;
+  --color-alert: #e5484d;
+  --color-warn: #d9a43b;
+  --color-ok: #3fb37f;
+  --color-info: #5b9bd5;
+}
+
+:root {
+  color-scheme: dark;
+}
+
 body {
-  background: #fafafa;
-  color: #18181b;
+  background: var(--color-base);
+  color: var(--color-fg);
+}
+
+/* Small uppercase system label. */
+.label {
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
 }

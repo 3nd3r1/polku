@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Outcome } from "@/ontology/engine";
 import type { Intake } from "@/ontology/schema";
 import { OutcomeBadge } from "./outcome-badge";
+import { SectionHeader } from "./section-header";
 
 type Result = { outcome: Outcome; sayThis: string } | { error: string };
 
@@ -82,64 +83,73 @@ function CallPanelInner() {
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5">
-      <div>
-        <h2 className="text-lg font-semibold">Call Polku</h2>
-        <p className="text-sm text-zinc-600">
-          Describe your symptoms. Polku checks them against published Nordic lung cancer criteria. It never diagnoses.
+    <section className="flex flex-col border-line lg:border-r">
+      <SectionHeader index="01" title="Intake" right={live ? "Call live" : "Idle"} />
+
+      <div className="flex flex-col gap-6 p-6">
+        <p className="text-sm text-muted">
+          Describe your symptoms. Polku checks them against published criteria and never diagnoses.
         </p>
-      </div>
 
-      {AGENT_ID ? (
-        <button
-          onClick={live ? () => conversation.endSession() : start}
-          className={`rounded-full px-6 py-4 text-lg font-semibold text-white ${live ? "bg-red-600" : "bg-emerald-600 hover:bg-emerald-700"}`}
-        >
-          {conversation.status === "connecting" ? "Connecting…" : live ? "End call" : "Start call"}
-        </button>
-      ) : (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-          Voice is off: set NEXT_PUBLIC_ELEVENLABS_AGENT_ID. The sample calls below use the same API.
-        </p>
-      )}
-      {live && <p className="text-sm text-zinc-600">{conversation.isSpeaking ? "Polku is speaking" : "Listening"}</p>}
-      {error && <p className="text-sm text-red-700">{error}</p>}
+        {AGENT_ID ? (
+          <button
+            onClick={live ? () => conversation.endSession() : start}
+            className={`flex h-20 items-center justify-between px-6 text-left text-lg font-medium transition-colors ${
+              live ? "bg-alert text-black" : "bg-fg text-black hover:bg-white"
+            }`}
+          >
+            <span>{conversation.status === "connecting" ? "Connecting" : live ? "End call" : "Call Polku"}</span>
+            <span className="font-mono text-sm">{live ? (conversation.isSpeaking ? "SPEAKING" : "LISTENING") : "VOICE →"}</span>
+          </button>
+        ) : (
+          <div className="border border-warn/40 bg-warn/5 p-4 text-sm text-warn">
+            Voice is off. Set NEXT_PUBLIC_ELEVENLABS_AGENT_ID to enable calling. Sample callers below use the same API.
+          </div>
+        )}
+        {error && <p className="font-mono text-xs text-alert">{error}</p>}
 
-      {transcript.length > 0 && (
-        <ol className="flex max-h-64 flex-col gap-2 overflow-y-auto text-sm">
-          {transcript.map((t, i) => (
-            <li key={i} className={t.role === "user" ? "text-zinc-900" : "text-zinc-500"}>
-              <span className="font-medium">{t.role === "user" ? "You" : "Polku"}:</span> {t.text}
-            </li>
-          ))}
-        </ol>
-      )}
+        {transcript.length > 0 && (
+          <ol className="flex max-h-72 flex-col gap-3 overflow-y-auto border-l border-line pl-4 text-sm">
+            {transcript.map((t, i) => (
+              <li key={i}>
+                <span className="label">{t.role === "user" ? "Caller" : "Polku"}</span>
+                <p className={t.role === "user" ? "text-fg" : "text-muted"}>{t.text}</p>
+              </li>
+            ))}
+          </ol>
+        )}
 
-      {result && (
-        <div className="rounded-lg bg-zinc-50 p-3 text-sm">
-          {"error" in result ? (
-            <p className="text-red-700">{result.error}</p>
-          ) : (
-            <>
-              <OutcomeBadge outcome={result.outcome} />
-              <p className="mt-2">{result.sayThis}</p>
-            </>
-          )}
-        </div>
-      )}
+        {result && (
+          <div className="border border-line bg-panel p-4">
+            {"error" in result ? (
+              <p className="font-mono text-xs text-alert">{result.error}</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="label">Polku says</span>
+                  <OutcomeBadge outcome={result.outcome} />
+                </div>
+                <p className="mt-3 text-sm leading-relaxed">{result.sayThis}</p>
+              </>
+            )}
+          </div>
+        )}
 
-      <div className="border-t border-zinc-100 pt-4">
-        <h3 className="text-sm font-medium text-zinc-500">Or play a sample caller</h3>
-        <div className="mt-2 flex flex-col gap-2">
-          {SAMPLES.map((s) => (
-            <button
-              key={s.label}
-              onClick={async () => setResult(await postIntake(s.intake, "sample"))}
-              className="rounded-lg border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50"
-            >
-              {s.label}
-            </button>
-          ))}
+        <div>
+          <p className="label">Sample callers · synthetic</p>
+          <ul className="mt-3 border-t border-line">
+            {SAMPLES.map((s) => (
+              <li key={s.label} className="border-b border-line">
+                <button
+                  onClick={async () => setResult(await postIntake(s.intake, "sample"))}
+                  className="flex w-full items-center justify-between px-1 py-3 text-left text-sm text-muted transition-colors hover:bg-raised hover:text-fg"
+                >
+                  {s.label}
+                  <span className="font-mono">→</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>

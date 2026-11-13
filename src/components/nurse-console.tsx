@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { lung } from "@/pathways/lung";
 import type { CaseAction, CaseView, ClockView } from "@/server/cases";
 import { OutcomeBadge } from "./outcome-badge";
+import { SectionHeader } from "./section-header";
 
 const STATUS_LABEL: Record<CaseView["status"], string> = {
-  pending_review: "Waiting for nurse callback",
+  pending_review: "Awaiting nurse callback",
   active: "In pathway",
   completed: "Pathway complete",
   dismissed: "Dismissed by nurse",
-  advised: "Advice given, no case opened",
+  advised: "Advice given · no case",
 };
 
 const subscribeSeconds = (tick: () => void) => {
@@ -33,7 +34,7 @@ function formatSpan(ms: number) {
   const hms = [Math.floor((s % 86400) / 3600), Math.floor((s % 3600) / 60), s % 60]
     .map((n) => String(n).padStart(2, "0"))
     .join(":");
-  return `${d} d ${hms}`;
+  return `${d}d ${hms}`;
 }
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
@@ -61,20 +62,22 @@ export function NurseConsole() {
     });
   }
 
+  const open = cases?.filter((c) => c.status === "pending_review" || c.status === "active").length ?? 0;
+
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">Nurse console</h2>
-        <span className="text-xs text-zinc-500">Live · synthetic and demo callers only</span>
+    <section className="flex min-w-0 flex-col">
+      <SectionHeader index="02" title="Nurse console" right={cases ? `${open} open · ${cases.length} total · live` : "Connecting"} />
+      {cases?.length === 0 && (
+        <p className="p-6 text-sm text-muted">No calls yet. Call Polku or play a sample caller.</p>
+      )}
+      <div className="flex flex-col">
+        {cases?.map((c) => <CaseRow key={c.id} c={c} now={now} onAction={(a) => act(c.id, a)} />)}
       </div>
-      {cases === null && <p className="text-sm text-zinc-500">Loading…</p>}
-      {cases?.length === 0 && <p className="text-sm text-zinc-500">No calls yet. Start a call or play a sample caller.</p>}
-      {cases?.map((c) => <CaseCard key={c.id} c={c} now={now} onAction={(a) => act(c.id, a)} />)}
     </section>
   );
 }
 
-function CaseCard({ c, now, onAction }: { c: CaseView; now: number | null; onAction: (a: CaseAction) => void }) {
+function CaseRow({ c, now, onAction }: { c: CaseView; now: number | null; onAction: (a: CaseAction) => void }) {
   const top = c.matches[0];
   const criterion = top && lung.criteria.find((k) => k.id === top.criterionId);
   const source = criterion && lung.sources.find((s) => s.id === criterion.sourceId);
@@ -82,59 +85,67 @@ function CaseCard({ c, now, onAction }: { c: CaseView; now: number | null; onAct
   const openStep = open && lung.steps.find((s) => s.id === open.stepId);
 
   return (
-    <article className="rounded-xl border border-zinc-200 bg-white p-4 text-sm">
-      <header className="flex flex-wrap items-center gap-2">
+    <article className="border-b border-line">
+      <header className="flex flex-wrap items-center gap-3 bg-panel px-6 py-3">
         <OutcomeBadge outcome={c.outcome} />
-        <span className="font-medium">{STATUS_LABEL[c.status]}</span>
-        <span className="ml-auto text-xs text-zinc-500">
-          {time(c.createdAt)} · {c.channel.replace("_", " ")}
+        <span className="text-sm">{STATUS_LABEL[c.status]}</span>
+        <span className="label ml-auto">
+          {time(c.createdAt)} · {c.channel.replace("_", " ")} · #{c.id.slice(0, 6)}
         </span>
       </header>
 
-      <p className="mt-2 text-zinc-600">
-        {c.intake.age ?? "Age unknown"}
-        {c.intake.age !== undefined && " y"} · smoking: {c.intake.smoking}
-      </p>
-      <ul className="mt-1 flex flex-col gap-0.5">
-        {c.intake.observations.map((o, i) => (
-          <li key={i}>
-            <span className="font-mono text-xs">{o.code}</span>
-            {o.durationDays !== undefined && <span className="text-zinc-500"> · {o.durationDays} d</span>}
-            <span className="text-zinc-600"> &ldquo;{o.quote}&rdquo;</span>
-            {o.knownCause && <span className="text-zinc-500"> (cause given: {o.knownCause})</span>}
-          </li>
-        ))}
-      </ul>
-
-      {criterion && (
-        <div className="mt-3 rounded-lg bg-zinc-50 p-3">
-          <p>
-            <span className="font-mono text-xs">{criterion.id}</span> {criterion.gloss}
+      <div className="grid gap-6 px-6 py-5 md:grid-cols-2">
+        <div>
+          <p className="label">Caller</p>
+          <p className="mt-2 font-mono text-sm">
+            {c.intake.age !== undefined ? `${c.intake.age} y` : "age ?"} · smoking {c.intake.smoking}
           </p>
-          <p className="mt-1 italic text-zinc-600">&ldquo;{criterion.quote}&rdquo;</p>
-          {source && (
-            <a href={source.url} target="_blank" rel="noreferrer" className="mt-1 block text-xs text-sky-700 underline">
-              {source.title}
-            </a>
-          )}
+          <ul className="mt-3 flex flex-col gap-2">
+            {c.intake.observations.map((o, i) => (
+              <li key={i} className="text-sm">
+                <span className="font-mono text-xs text-fg">{o.code}</span>
+                {o.durationDays !== undefined && <span className="font-mono text-xs text-dim"> · {o.durationDays}d</span>}
+                <p className="text-muted">&ldquo;{o.quote}&rdquo;</p>
+                {o.knownCause && <p className="text-xs text-dim">Cause given: {o.knownCause}</p>}
+              </li>
+            ))}
+          </ul>
         </div>
-      )}
+
+        {criterion && (
+          <div className="border-l border-line-strong pl-4">
+            <p className="label">Matched criterion · {criterion.id}</p>
+            <p className="mt-2 text-sm">{criterion.gloss}</p>
+            <p className="mt-2 text-sm text-muted italic">&ldquo;{criterion.quote}&rdquo;</p>
+            {source && (
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block font-mono text-[11px] text-info hover:underline"
+              >
+                {source.title} ↗
+              </a>
+            )}
+          </div>
+        )}
+      </div>
 
       {open && openStep && (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-end gap-4 px-6 pb-4">
           <Countdown clock={open} now={now} label={openStep.name} maxDays={openStep.maxDays} />
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex">
             {c.status === "pending_review" && (
               <>
                 <Button onClick={() => onAction("confirm")} primary>
-                  Callback done, confirm
+                  Callback done · confirm
                 </Button>
                 <Button onClick={() => onAction("dismiss")}>Dismiss</Button>
               </>
             )}
             {c.status === "active" && (
               <Button onClick={() => onAction("advance")} primary>
-                Step done
+                Step done →
               </Button>
             )}
           </div>
@@ -151,11 +162,11 @@ function Countdown({ clock, now, label, maxDays }: { clock: ClockView; now: numb
   const left = new Date(clock.dueAt).getTime() - now;
   return (
     <div>
-      <p className="text-xs text-zinc-500">
-        {label} · target {maxDays} d
+      <p className="label">
+        {label} · target {maxDays}d · {left < 0 ? "overdue" : "remaining"}
       </p>
-      <p className={`font-mono text-lg ${left < 0 ? "text-red-600" : "text-zinc-900"}`}>
-        {left < 0 ? "overdue " : ""}
+      <p className={`mt-1 font-mono text-3xl font-light tabular-nums ${left < 0 ? "text-alert" : "text-fg"}`}>
+        {left < 0 && "−"}
         {formatSpan(left)}
       </p>
     </div>
@@ -164,16 +175,18 @@ function Countdown({ clock, now, label, maxDays }: { clock: ClockView; now: numb
 
 function Timeline({ clocks, now }: { clocks: ClockView[]; now: number | null }) {
   return (
-    <ol className="mt-3 grid grid-cols-7 gap-1">
-      {lung.steps.map((step) => {
+    <ol className="grid grid-cols-7 border-t border-line">
+      {lung.steps.map((step, i) => {
         const k = clocks.find((c) => c.stepId === step.id);
         const end = k ? (k.stoppedAt ? new Date(k.stoppedAt).getTime() : (now ?? 0)) : 0;
         const late = k && end > new Date(k.dueAt).getTime();
-        const color = !k ? "bg-zinc-200" : late ? "bg-red-500" : k.stoppedAt ? "bg-emerald-500" : "bg-amber-400";
+        const color = !k ? "bg-raised" : late ? "bg-alert" : k.stoppedAt ? "bg-ok" : "bg-warn";
         return (
-          <li key={step.id} title={`${step.name}: target ${step.maxDays} d`}>
-            <div className={`h-1.5 rounded-full ${color}`} />
-            <p className="mt-1 truncate text-[10px] text-zinc-500">{step.name}</p>
+          <li key={step.id} title={`${step.name}: target ${step.maxDays} days`} className="border-r border-line last:border-r-0">
+            <div className={`h-1 ${color}`} />
+            <p className="truncate px-2 py-2 font-mono text-[10px] text-dim uppercase">
+              {String(i).padStart(2, "0")} {step.name}
+            </p>
           </li>
         );
       })}
@@ -185,7 +198,9 @@ function Button({ children, onClick, primary }: { children: React.ReactNode; onC
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg px-3 py-1.5 text-sm font-medium ${primary ? "bg-zinc-900 text-white hover:bg-zinc-700" : "border border-zinc-300 hover:bg-zinc-50"}`}
+      className={`h-10 border px-4 text-sm transition-colors ${
+        primary ? "border-fg bg-fg text-black hover:bg-white" : "border-line-strong text-fg hover:bg-raised"
+      }`}
     >
       {children}
     </button>

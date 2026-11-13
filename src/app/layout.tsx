@@ -15,6 +15,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Polku",
   description: "Every cancer pathway, on the clock. Prototype with synthetic data.",
+  // Tell the Dark Reader extension the page is already dark.
+  other: { "darkreader-lock": "" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
