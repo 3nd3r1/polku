@@ -22,12 +22,9 @@ export class ActionError extends Error {
 
 async function startClock(tx: Tx, caseId: string, stepId: StepId, now: Date) {
   const step = lung.steps.find((s) => s.id === stepId)!;
-  await tx.insert(clocks).values({
-    caseId,
-    stepId,
-    startedAt: now,
-    dueAt: new Date(now.getTime() + step.maxDays * DAY_MS),
-  });
+  const dueAt = new Date(now.getTime() + step.maxDays * DAY_MS);
+  await tx.insert(clocks).values({ caseId, stepId, startedAt: now, dueAt });
+  return dueAt;
 }
 
 /** SubmitIntake, plus OpenFastTrackCase when a suspicion criterion matches. */
@@ -36,6 +33,7 @@ export async function submitIntake(intake: Intake, channel: (typeof CHANNELS)[nu
   const fastTrack = evaluation.outcome === "fast_track";
   const now = new Date();
 
+  let callbackDueAt: Date | null = null;
   const caseId = await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(cases)
@@ -55,7 +53,7 @@ export async function submitIntake(intake: Intake, channel: (typeof CHANNELS)[nu
       .returning({ id: cases.id });
     await tx.insert(audit).values({ caseId: row.id, action: "SubmitIntake", actor: "system", data: { channel } });
     if (fastTrack) {
-      await startClock(tx, row.id, "callback", now);
+      callbackDueAt = await startClock(tx, row.id, "callback", now);
       await tx.insert(audit).values({
         caseId: row.id,
         action: "OpenFastTrackCase",
@@ -67,7 +65,12 @@ export async function submitIntake(intake: Intake, channel: (typeof CHANNELS)[nu
   });
 
   publishChange();
-  return { caseId, outcome: evaluation.outcome, sayThis: sayThis(evaluation, lung) };
+  return {
+    caseId,
+    outcome: evaluation.outcome,
+    sayThis: sayThis(evaluation, lung),
+    callbackDueAt: (callbackDueAt as Date | null)?.toISOString() ?? null,
+  };
 }
 
 export const CaseAction = z.enum(["confirm", "advance", "dismiss"]);
