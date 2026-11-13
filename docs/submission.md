@@ -11,7 +11,7 @@ Polku
 ## Punchline
 
 ```
-A phone line that puts every suspected lung cancer patient on the clock: published Nordic criteria, a nurse callback, and per-county waiting times Finland can't measure today.
+A sovereign ontology for Finnish cancer care: patients call, published Nordic criteria decide, a nurse calls back, and every pathway step runs on a clock per county.
 ```
 
 ## Description
