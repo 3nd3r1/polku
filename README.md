@@ -11,7 +11,8 @@
 
 <p align="center">
   <a href="docs/Polku-white-paper.pdf"><b>Read our research paper here</b></a>
-  &nbsp;(<a href="docs/Polku-white-paper-print.pdf">print version</a>)
+  &nbsp;(<a href="docs/Polku-white-paper-print.pdf">print version</a>) ·
+  <a href="docs/polku-deck.pdf"><b>Pitch deck</b></a>
 </p>
 
 ---
