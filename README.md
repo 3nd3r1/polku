@@ -1,80 +1,73 @@
 # Polku
 
-**Every cancer pathway, on the clock.** A phone line for suspected lung cancer that applies published Nordic referral criteria, books a nurse callback, and runs a clock on every pathway step, rolled up per Finnish wellbeing county.
+A phone line for suspected lung cancer. The caller describes their symptoms, a rules engine checks them against published Nordic referral criteria, and a nurse calls back by a deadline. Every pathway step after that runs on a clock, and the clocks roll up per wellbeing county.
 
-Built at Junction 2026 for the AstraZeneca challenge *Equal Care Across Finland*.
+Built at Junction 2026 for the AstraZeneca challenge "Equal Care Across Finland". Live at https://polku.eros.ender.fi.
 
 ## Why
 
-- The national cancer strategy 2026-2035 sets a goal of raising 5-year lung cancer survival by 14 percentage points to reach the Nordic level.
-- The strategy's equality indicator, "patients get treatment within target times", can't be measured per county today. Finland has no national lung pathway yet, and no public per-county access-time data exists.
-- Counties already promise different things: Pirkanmaa, CT within about a week of the referral being processed; Keski-Suomi, a specialist within about a month.
+Finland's cancer strategy measures equality as "patients get treatment within target times", but nothing records those times per county today. Finland also has no national lung cancer pathway yet. Polku runs the pathway and the measurement comes out of it. Sources are in `docs/strategy.md` and `docs/lung-pathway-sources.md`.
 
-Sources for every claim are in [`docs/strategy.md`](docs/strategy.md) and [`docs/lung-pathway-sources.md`](docs/lung-pathway-sources.md).
+## How a call works
 
-## How it works
+1. The caller gives their identity code and confirms with Mobile ID (simulated). Until then the agent can't read anything about anyone, and after that only the caller's own case. The server enforces this in `src/server/identity.ts` and logs every tool call.
+2. The voice agent (ElevenLabs) turns what the caller says into typed symptoms. It doesn't triage or diagnose.
+3. A deterministic engine matches the symptoms against criteria in `src/pathways/lung.ts`, each with a cited source. Red flags always return "call 112".
+4. A match opens a case with a nurse callback deadline, which the agent reads out. When the nurse confirms, each pathway step gets its own deadline.
 
-1. **The patient calls and is identified first.** A phone call is the only patient interface, because most cancer patients are older ([`docs/product.md`](docs/product.md)). The caller gives their identity code, confirmed by Mobile ID (**simulated**) against a synthetic population register. Until then the agent can read nothing about anyone, and after it only the caller's own case. The server enforces this and logs every tool call ([`src/server/identity.ts`](src/server/identity.ts)).
-2. **The LLM extracts, it never triages.** The voice agent turns speech into typed symptom objects, each with the caller's own words.
-3. **A deterministic engine matches.** The symptoms are checked against published criteria (Swedish SVF lung pathway v1.4, Danish and Finnish regional guidance), and each criterion cites its source. Red flags always return "call 112", enforced in the engine.
-4. **A nurse decides.** A match opens a case with a callback deadline. The nurse confirms, and each pathway step starts its own clock with a sourced target time.
-5. **The county sees the delays** (in progress). Clocks are rolled up per wellbeing county and step.
+Patients only ever use a phone. All screens are for staff:
 
-## The screens (staff only)
-
-| Tab | Who | What |
+| Screen | Who | What |
 |---|---|---|
-| Screening (`/`) | Care team | Each call live: identification, symptoms, criteria check, outcome |
-| Nurse (`/nurse`) | Callback nurse | Cases to call back, step clocks, one action per step |
-| Cockpit | County | Planned |
+| Screening (`/`) | Care team | Each call live: identity, symptoms, criteria match, outcome |
+| Nurse (`/nurse`) | Callback nurse | Cases to call back, step clocks, the next action |
+| Cockpit | County | Not built yet |
 
-No microphone? The Screening tab's **Simulate** buttons play scripted synthetic callers through the same API, including an **Impostor** who tries to get a case without identifying. Demo identity codes are in [`agent/README.md`](agent/README.md).
+No microphone? "Play a call" on the Screening screen runs scripted synthetic callers through the same API, including an impostor who tries to skip identification. Demo identity codes are in `agent/README.md`.
 
 ## Run it
 
 ```sh
-nix-shell                 # Node 22 (NixOS); otherwise use any Node 22
+nix-shell                 # Node 22 on NixOS, otherwise any Node 22
 npm install
 cp .env.example .env.local
 npm run db:up             # Postgres in Docker on port 5433
 npm run db:push           # create tables
-npm run db:seed           # reset to the synthetic register and open cases
+npm run db:seed           # synthetic register and open cases
 npm run dev               # http://localhost:3000
-npm test                  # engine tests
+npm test
 ```
 
-Voice calls need an ElevenLabs agent. See [`agent/README.md`](agent/README.md).
+Voice calls need an ElevenLabs agent, see `agent/README.md`.
 
 ## Deploy
 
-Live at **https://polku.eros.ender.fi** (Coolify, Dockerfile build, Aiven Postgres). The container applies the schema and seeds the synthetic register on first boot, and runs in Finnish time.
+Pushing to main deploys through Coolify (Dockerfile build, Aiven Postgres). The container creates the schema and seeds on first boot.
 
 ```sh
-nix-shell
-git push                     # deploys: GitHub webhook → Coolify
-npm run deploy               # manual redeploy, only if the webhook fails
-npm run demo:reset           # wipe calls and cases on production, reseed (needs ADMIN_TOKEN in .env.local)
-npm run agent:push           # push prompt and tools to the ElevenLabs agent
+npm run deploy            # manual redeploy if the webhook fails
+npm run demo:reset        # wipe and reseed production, needs ADMIN_TOKEN in .env.local
+npm run agent:push        # push prompt and tools to ElevenLabs
 ```
 
-## Code map
+## Code
 
 | Path | What |
 |---|---|
-| `src/pathways/lung.ts` | The lung pathway as code: criteria, steps, time limits, sources |
-| `src/ontology/` | Intake schema (zod), deterministic engine, tests |
-| `src/server/` | Actions: calls, identification, intake, nurse actions, live updates |
+| `src/pathways/lung.ts` | Lung pathway: criteria, steps, time limits, sources |
+| `src/ontology/` | Intake schema (zod), rules engine, tests |
+| `src/server/` | Calls, identification, intake, nurse actions, live updates |
 | `src/db/` | Drizzle schema: calls, cases, clocks, audit |
-| `src/app/api/` | `calls`, `intake` (agent tools), `cases`, `events` (SSE) |
+| `src/app/api/` | Agent tools, cases, SSE events |
 | `agent/` | Voice agent prompt and setup |
-| `docs/` | Product, build plan, story and demo, research and sources |
+| `docs/` | Product, build plan, demo, research |
 
-## Honesty notes
+## Limits
 
-- **Synthetic data only.** No real patient data. People returned by the simulated identification are fictional.
-- **Strong identification is simulated.** Real integration would go through Suomi.fi e-Identification or a Mobile ID provider.
-- **Finland's own lung targets don't exist yet.** The Swedish SVF times are used as a placeholder, with Danish and Norwegian times documented alongside.
-- **Not a medical device in its current form.** As a product, software that applies referral criteria to patient symptoms would need medical device conformity assessment (CE marking) before clinical use. In Polku a nurse makes every clinical decision.
+- All data is synthetic. Nobody in the register is real.
+- Identification is simulated. A real version would use Suomi.fi e-Identification or a Mobile ID provider.
+- Finland has no lung pathway target times yet, so we use the Swedish ones as placeholders.
+- It isn't a medical device. Clinical use would need CE marking, and a nurse makes every clinical decision.
 
 ## License
 
