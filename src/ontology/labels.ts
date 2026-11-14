@@ -27,3 +27,25 @@ export function formatDuration(days: number) {
   if (days >= 14) return `${Math.round(days / 7)} weeks`;
   return days === 1 ? "1 day" : `${days} days`;
 }
+
+/** How the agent names each step to a caller. */
+export const STEP_SPOKEN: Record<string, string> = {
+  callback: "a call from a nurse",
+  primary_assessment: "a CT scan",
+  referral: "your referral to a lung specialist",
+  first_visit: "your first visit to a lung specialist",
+  diagnostics: "further tests",
+  mdt_decision: "the treatment team's decision",
+  treatment_start: "the start of your treatment",
+};
+
+/** "Tuesday 17 November at 14:00", always Finnish time, whatever the server's zone. */
+export const spokenDayTime = (d: Date) =>
+  d.toLocaleString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Helsinki",
+  });

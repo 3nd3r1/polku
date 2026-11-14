@@ -20,7 +20,8 @@ Status checked against the code Sat 14.11 09:00.
 | **Spoken deadline + countdown in seconds**, same time in voice and UI | Todo. `sayThis` still says "within 2 days". |
 | **Stage mode for Screening**: readable from 2 m, large live transcript, quote → symptom, the promise as the biggest text | Todo |
 | **Red-flag full-screen state**, labelled "engine rule, not model output" | Todo (one line of text today) |
-| **Three scripted callers** in Simulate: Matti, Aino, red flag | Done, but `src/sim/people.ts` makes Matti 58 (born 1968). Story says 71. |
+| **Scripted callers** in Simulate: Matti, Aino, red flag, Liisa (open case), Impostor | Done |
+| **Strong identification gate**: identity code + simulated Mobile ID, synthetic register in Postgres, access log on screen, tests | Done |
 | **Cockpit v1**: county tile grid, "today: not measured" (real) vs "with Polku" (synthetic, labelled), one headline sentence, one recommendation card, live bump from the call | Todo |
 | **Deploy** before the video is recorded | Todo |
 | 2-minute video | Todo |
@@ -32,7 +33,8 @@ Status checked against the code Sat 14.11 09:00.
 | Eval table backing "try to break it" | Landing page, one screen | Real patient data |
 | Gemma on Verda as the agent's LLM | Finnish-language call, only if it is clean | Outbound callback call |
 | Aiven Postgres in prod | | Oxylabs/Context.dev, Modal, LoRA fine-tune |
-| CRACI CI, Codex usage log | | More slot booking or capacity work (frozen as is) |
+| CRACI CI, Codex usage log | | Patient picks a slot on a screen (SMS reply only, see "Handoff scheduler") |
+| **Handoff scheduler** (see below): recommended slot, "Ask patient", confirmed by SMS reply | | |
 | | | General ontology graph browsing (replaced by the "Why?" trace) |
 | | | Postcode lottery as an app view (it's a deck graphic) |
 | | | Criteria beyond what the three cards and the eval need |
@@ -50,7 +52,7 @@ Rules that come from us, not from a published pathway. `src/pathways/lung.ts` ci
 
 - **Red flags → 112.** Massive haemoptysis, severe breathlessness or sudden severe chest pain always return "call 112 now", enforced in the engine whatever the LLM says.
 - **Nurse callback within 2 days** of a match. No Nordic pathway defines this step. Nearest precedent: Pirkanmaa processes lung referrals within 1-2 working days.
-- **No case without identity.** The intake is refused until the caller is verified.
+- **Nothing before identification.** Until `verify_identity` succeeds, every tool returns nothing about any person (`src/server/identity.ts`). After it, tools only reach the identified caller: no tool takes a name, identity code or person id, so there is no lookup to inject. Three failed codes lock the call. Every tool call is logged as allowed or refused and shown on Screening.
 - **No case without a clear intake.** The agent is told what is missing and asks again.
 
 ## Architecture
@@ -61,8 +63,10 @@ Phone or browser call
    ▼
 ElevenLabs agent ── prompt: say it is an AI, identify first, never diagnose (agent/prompt.md)
    │  LLM: picked in the ElevenLabs dashboard today | target: Gemma on Verda (OpenAI-compatible) | fallback: Gemini
-   │  tools: verify_identity → POST /api/calls/<id>/verify  (simulated Mobile ID)
+   │  tools: verify_identity → POST /api/calls/<id>/verify  (hetu → register → simulated Mobile ID)
+   │         get_case        → POST /api/calls/<id>/case    (own open case only)
    │         record_intake   → POST /api/intake            (zod → engine → case, clocks, audit)
+   │  all three pass the access gate and write access_log
    │  each returns sayThis, which the agent reads out
    ▼
 SSE /api/events → Screening (/) · Nurse (/nurse) · Cockpit (/cockpit, todo)
@@ -94,11 +98,32 @@ Facts checked Fri:
 2. **Voice test:** 10 scripted calls (2 each, both of us, 1 in Finnish if supported). Log turn latency and wrong extractions.
 3. **Hallway test:** Saturday afternoon, three hackers try the role cards. Fix the top 2 confusions.
 
+## Handoff scheduler
+
+The pitch is the gaps between steps (`story-and-demo.md`, "No gaps"). When a step ends, the next one must already be on its way to being booked. Today the nurse picks one of four slots from `slotsFor` (`src/sim/capacity.ts`) and books it. Target flow:
+
+```
+Step N stops (or nurse confirms the case)
+  → scheduler: next step → capability → resources in the patient's county → free slots before the due time
+  → one RECOMMENDED slot + 2 alternatives, each with "on time" / "N days late"
+  → Nurse: [Ask patient]                       status: offered
+  → SMS to the patient's phone: "1) Tue 18.11 09:00 ... Reply 1, 2 or 3"
+  → reply → slot booked → spoken/SMS confirmation   status: booked
+  → no reply in 24 h → nurse calls                  status: escalated
+```
+
+Rules:
+
+- **The recommendation is a rule, not the LLM.** Rank: on time before late, then earliest, then fits the patient's stated preference. Show the reason in one line: "Earliest slot before the deadline, Tuesday morning as asked."
+- **The LLM's only part** is extracting scheduling preferences from the call as typed fields (`preferredDays`, `preferredTime`, `needsTransport`), same as symptoms. Nothing about the order of slots comes from the model.
+- **Patient side is phone only.** SMS with numbered options, reply with a digit. No link, no app. In the demo the reply is a "Simulate patient reply" button, labelled as such. Real Twilio SMS only if time.
+- **Every offer is an action with an audit entry:** `RecommendSlot` (system), `OfferSlots` (nurse), `ConfirmSlot` (patient via SMS), `EscalateNoReply` (system).
+- **The cockpit can count it:** time from step end to next booking is the "gap" per county.
+
 ## Build order
 
 1. Promise + countdown: the engine returns an absolute deadline, the agent speaks it, the UI ticks in seconds. All clocks read one sim time source (needed for 6). (A)
 2. Stage mode for Screening, including the red-flag state. (B)
-3. Fix Matti's age in the synthetic people. (B)
 4. Cockpit v1: synthetic generator per county, tile grid with the two states, headline sentence, recommendation card, live bump over SSE. (A)
 5. Deploy: VPS via Coolify, Aiven Postgres, CI on CRACI. Before the video, so it's recorded against the real URL. (A)
 6. "+1 day": a promise breaks, an escalation appears on Nurse. (A)
@@ -119,7 +144,7 @@ Facts checked Fri:
 |---|---|---|
 | Sat 00:00-03:00 | 1: deadline from the engine, one sim time source | 2: stage mode, red-flag state |
 | Sat 03:00-09:00 | Sleep | Sleep |
-| Sat 09:00-12:00 | 4: cockpit generator + tile grid | 3, agent tuning, grandparent call if Finnish works |
+| Sat 09:00-12:00 | 4: cockpit generator + tile grid | Agent tuning, grandparent call if Finnish works |
 | Sat 12:00 | Gemma on Verda: go or no-go | |
 | Sat 12:00-14:00 | 4: live bump, recommendation card. 5: deploy. | UI copy pass |
 | **Sat 14:00** | **Table run works end to end on the deployed URL.** Hallway test. | |

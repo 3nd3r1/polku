@@ -4,24 +4,21 @@ import { db } from "../db";
 import { audit, calls, type CASE_STATUSES, cases, clocks, type CHANNELS } from "../db/schema";
 import { missingQuestions } from "../ontology/clarity";
 import { evaluate, sayThis, type Outcome } from "../ontology/engine";
+import { spokenDayTime, STEP_SPOKEN } from "../ontology/labels";
 import type { Intake } from "../ontology/schema";
 import { lung } from "../pathways/lung";
 import { slotsFor } from "../sim/capacity";
 import { ageOf, type Person } from "../sim/people";
 import { publishChange } from "./bus";
+import { ActionError } from "./errors";
+import { logAccess, refuse, requireIdentified } from "./identity";
+
+export { ActionError };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StepId = (typeof lung.steps)[number]["id"];
-
-export class ActionError extends Error {
-  constructor(
-    message: string,
-    readonly status: 404 | 409 | 422,
-  ) {
-    super(message);
-  }
-}
+type Clock = typeof clocks.$inferSelect;
 
 async function startClock(tx: Tx, caseId: string, stepId: StepId, now: Date) {
   const step = lung.steps.find((s) => s.id === stepId)!;
@@ -30,27 +27,127 @@ async function startClock(tx: Tx, caseId: string, stepId: StepId, now: Date) {
   return dueAt;
 }
 
+const OPEN: (typeof CASE_STATUSES)[number][] = ["pending_review", "active"];
+
+async function openCaseOf(personId: string) {
+  const [c] = await db
+    .select()
+    .from(cases)
+    .where(and(eq(cases.personId, personId), inArray(cases.status, OPEN)))
+    .orderBy(desc(cases.createdAt))
+    .limit(1);
+  return c ?? null;
+}
+
+async function runningClock(caseId: string): Promise<Clock | null> {
+  const [k] = await db
+    .select()
+    .from(clocks)
+    .where(and(eq(clocks.caseId, caseId), isNull(clocks.stoppedAt)));
+  return k ?? null;
+}
+
+/** What the caller hears about their case. Fixed text from the clock, never generated. */
+export function caseStatusSentence(k: Clock, now = new Date()) {
+  const step = STEP_SPOKEN[k.stepId] ?? "the next step";
+  if (k.scheduledAt) {
+    return `Your next step is ${step}. It is booked for ${spokenDayTime(k.scheduledAt)}${k.unit ? ` at ${k.unit}` : ""}.`;
+  }
+  if (k.dueAt < now) {
+    return `Your next step is ${step}. It was promised by ${spokenDayTime(k.dueAt)} and is late. I have noted that you called, and the care team will see it.`;
+  }
+  return `Your next step is ${step}. It is promised by ${spokenDayTime(k.dueAt)}.`;
+}
+
 /**
- * SubmitIntake, plus OpenFastTrackCase when a suspicion criterion matches.
- * With a verified call, age comes from the identity, never from the LLM.
+ * GetCase: the identified caller's own open case, nothing else. Takes no
+ * lookup key, so the agent cannot ask for anyone else's.
+ */
+export async function getCase(callId: string) {
+  const { person } = await requireIdentified(callId, "get_case");
+  const open = await openCaseOf(person.id);
+  if (!open) {
+    await logAccess(callId, "get_case", true, "Read own record: no open case");
+    publishChange();
+    return { summary: null, sayThis: "The caller has no open case. Ask what symptoms they have been having." };
+  }
+  const clock = await runningClock(open.id);
+  const summary = clock ? caseStatusSentence(clock) : "Your case is open with the care team.";
+  await db.update(calls).set({ caseId: open.id }).where(eq(calls.id, callId));
+  await db.insert(audit).values({ caseId: open.id, action: "CallerCheckedStatus", actor: "system", data: { callId } });
+  await logAccess(callId, "get_case", true, `Read own open case (${clock ? clock.stepId : open.status})`);
+  publishChange();
+  return {
+    summary,
+    sayThis: `The caller has an open case. Tell them: "${summary}" Then ask whether anything is new or worse. If so, collect it and call record_intake.`,
+  };
+}
+
+/**
+ * SubmitIntake. A new caller gets a case (OpenFastTrackCase when a suspicion
+ * criterion matches). A caller with an open case gets the symptoms added to it.
+ * Age comes from the verified identity, never from the LLM.
  */
 export async function submitIntake(raw: Intake, channel: (typeof CHANNELS)[number], callId: string) {
-  const [call] = await db.select().from(calls).where(eq(calls.id, callId));
-  if (!call) throw new ActionError("Call not found", 404);
-  // Gate 1: nothing is recorded for an unidentified caller.
-  if (call.status !== "verified" || !call.person) {
-    throw new ActionError("Identity not verified. Call verify_identity first, then record the intake.", 409);
+  const { call, person } = await requireIdentified(callId, "record_intake");
+  if (call.outcome) {
+    throw await refuse(callId, "record_intake", "Refused: already recorded on this call", "Already recorded on this call. Say goodbye.", 409);
   }
-  const person = call.person;
   const intake: Intake = { ...raw, age: ageOf(person) };
 
-  // Gate 2: the intake must be clear enough to evaluate. The agent asks, then calls again.
+  // The intake must be clear enough to evaluate. The agent asks, then calls again.
   const questions = missingQuestions(intake);
   if (questions.length > 0) {
     throw new ActionError(`Not recorded yet. ${questions.join(" ")} Then call record_intake again with everything.`, 422);
   }
 
   const evaluation = evaluate(intake, lung);
+  const open = await openCaseOf(person.id);
+  if (open) return addToOpenCase(open, intake, evaluation, call.id);
+  return openNewCase(person, intake, evaluation, channel, call.id);
+}
+
+async function addToOpenCase(
+  open: typeof cases.$inferSelect,
+  intake: Intake,
+  evaluation: ReturnType<typeof evaluate>,
+  callId: string,
+) {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(cases)
+      .set({
+        intake: { ...open.intake, smoking: intake.smoking, observations: [...open.intake.observations, ...intake.observations] },
+      })
+      .where(eq(cases.id, open.id));
+    await tx.insert(audit).values({
+      caseId: open.id,
+      action: "CallerUpdate",
+      actor: "system",
+      data: { callId, observations: intake.observations, outcome: evaluation.outcome },
+    });
+    await tx.update(calls).set({ status: "screened", caseId: open.id, outcome: evaluation.outcome }).where(eq(calls.id, callId));
+  });
+  await logAccess(callId, "record_intake", true, `Added ${intake.observations.length} symptom(s) to own open case`);
+  publishChange();
+  return {
+    caseId: open.id,
+    outcome: evaluation.outcome,
+    sayThis:
+      evaluation.outcome === "call_112"
+        ? sayThis(evaluation, lung)
+        : "Thank you. I have added this to your case, and the nurse will see it.",
+    callbackDueAt: null,
+  };
+}
+
+async function openNewCase(
+  person: Person,
+  intake: Intake,
+  evaluation: ReturnType<typeof evaluate>,
+  channel: (typeof CHANNELS)[number],
+  callId: string,
+) {
   const fastTrack = evaluation.outcome === "fast_track";
   const now = new Date();
 
@@ -61,7 +158,8 @@ export async function submitIntake(raw: Intake, channel: (typeof CHANNELS)[numbe
       .values({
         createdAt: now,
         channel,
-        callId: call.id,
+        callId,
+        personId: person.id,
         person,
         county: person.county,
         pathwayId: lung.id,
@@ -85,14 +183,15 @@ export async function submitIntake(raw: Intake, channel: (typeof CHANNELS)[numbe
         data: { criterionId: evaluation.matches[0].criterion.id },
       });
     }
-    await tx.update(calls).set({ status: "screened" }).where(eq(calls.id, call.id));
+    await tx.update(calls).set({ status: "screened", caseId: row.id, outcome: evaluation.outcome }).where(eq(calls.id, callId));
     return row.id;
   });
+  await logAccess(callId, "record_intake", true, `Recorded intake: new case (${evaluation.outcome.replace("_", " ")})`);
 
   publishChange();
   return {
     caseId,
-    outcome: evaluation.outcome,
+    outcome: evaluation.outcome satisfies Outcome,
     sayThis: sayThis(evaluation, lung),
     callbackDueAt: (callbackDueAt as Date | null)?.toISOString() ?? null,
   };

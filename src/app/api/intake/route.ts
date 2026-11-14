@@ -9,7 +9,22 @@ export function GET() {
     {
       name: "verify_identity",
       description:
-        "Strongly identify the caller with Mobile ID. Call this first, before asking about symptoms. Returns who the caller is.",
+        "Strongly identify the caller. Call this first, with the personal identity code (henkilötunnus) the caller says. The server confirms it with Mobile ID. Nothing about the caller is available before this succeeds.",
+      parameters: {
+        type: "object",
+        properties: {
+          hetu: {
+            type: "string",
+            description: "The caller's personal identity code exactly as they said it, format DDMMYY-NNNX, e.g. 131052-308T.",
+          },
+        },
+        required: ["hetu"],
+      },
+    },
+    {
+      name: "get_case",
+      description:
+        "After identification: returns the caller's own open case and the sentence to tell them, or says they have none. Takes no parameters.",
       parameters: { type: "object", properties: {} },
     },
     {

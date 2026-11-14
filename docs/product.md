@@ -32,7 +32,6 @@ In Sweden his symptoms match a published criterion on day one (SE-M1: new cough 
 | Screening | `/` | Care team, judges | Each call live: identity, symptoms, criteria check, outcome |
 | Nurse | `/nurse` | Callback nurse | Cases to call back, step clocks, one action per step |
 | Cockpit | `/cockpit` (not built) | Wellbeing county | Clocks rolled up per county and step |
-| Ontology | `/ontology` | Tech judges | Object types, links and actions |
 
 ## Phone first
 
@@ -46,10 +45,11 @@ Why this is the moat:
 
 ### The call
 
-1. **Strong identification.** The caller is identified first, so the nurse gets a verified person. Identity also gives age (from the identity code) and wellbeing county (from the population register), so the agent never asks for them and the cockpit gets its key for free.
-2. **Symptom intake.** The agent asks only what the criteria need: symptoms in the caller's words, how long, any known cause, smoking status. It keeps asking until the intake is clear.
-3. **Deterministic match.** The engine checks the intake against cited criteria. Red flags return "call 112" immediately.
-4. **Outcome spoken back.** For a match, a deadline: "A nurse will call you by Sunday 21:47." The nurse callback clock starts.
+1. **Strong identification.** The caller is identified first, so the nurse gets a verified person. Identity also gives age (from the identity code) and wellbeing county (from the population register), so the agent never asks for them and the cockpit gets its key for free. **Before identification the agent can read nothing about anyone; after it, only the caller's own data.** The server enforces this, not the prompt, and every tool call is logged on screen.
+2. **Case check.** If the caller already has an open case, they hear where it stands ("Your next step is a CT scan. It is booked for Monday 10:30.") and can report anything new.
+3. **Symptom intake.** The agent asks only what the criteria need: symptoms in the caller's words, how long, any known cause, smoking status. It keeps asking until the intake is clear.
+4. **Deterministic match.** The engine checks the intake against cited criteria. Red flags return "call 112" immediately.
+5. **Outcome spoken back.** For a match, a deadline: "A nurse will call you by Sunday 21:47." The nurse callback clock starts.
 
 ### Identification options
 
@@ -59,12 +59,14 @@ Why this is the moat:
 | Bank ID via Suomi.fi e-Identification | Needs a browser or bank app | Poor on a phone-only call | Fallback: SMS link |
 | Caller ID, nurse confirms identity on callback | No strong auth in the call | Best reach | Weakest assurance, always available |
 
-**In the prototype identification is simulated** and labelled so: the agent says it sent a Mobile ID request, the server approves it after a few seconds and returns a synthetic person. A real integration would go through Suomi.fi e-Identification or a Mobile ID provider.
+**In the prototype** the caller says their identity code (hetu). The server checks its check character, looks it up in a synthetic population register (Postgres, test-range codes 900-999), and sends a simulated Mobile ID confirmation to the registered number, which always approves. Saying a hetu alone is weak identification, because it isn't secret; the Mobile ID step is what makes it strong. The agent never gets the code back, only first name, age and county. A real integration would get the hetu from Suomi.fi e-Identification or a Mobile ID broker, never through the voice model.
+
+Precedents: Kela lets callers identify in OmaKela first and type a code during the call; county lines like Pohjois-Savo recognise the caller's number for routing only. No county voice line we found identifies callers strongly.
 
 ## Sovereign ontology
 
 - **Pathway as code.** Each pathway is one typed, versioned definition of criteria, steps and time limits, and every rule cites its source (`src/pathways/lung.ts`). A new cancer is a new file, not a new product.
-- **Objects, links, actions.** Callers, cases, criteria, steps, clocks, counties, hospitals and resources are typed objects (`src/ontology/`, shown in the Ontology tab). Every change is a typed action with a permitted role and an audit entry.
+- **Objects, links, actions.** Callers, cases, criteria, steps, clocks, counties, hospitals and resources are typed objects (`src/ontology/`). Every change is a typed action with a permitted role and an audit entry.
 - **Deterministic where it matters.** The LLM only turns speech into typed symptoms. Matching is rules, and every outcome can be traced to a source.
 - **Sovereign data (target, not yet true).** Personal data processed only by an open model (Gemma) on EU infrastructure (Verda). Hosted models (Gemini) see only county totals. Today the voice agent runs on ElevenLabs, which on our tier routes voice through the US. Say so before anyone asks: the voice layer is swappable.
 

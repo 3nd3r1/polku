@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { appendTranscript } from "@/server/calls";
-import { ActionError } from "@/server/cases";
+import { ActionError } from "@/server/errors";
 
 const Body = z.object({ role: z.enum(["agent", "caller"]), text: z.string().min(1).max(2000) });
 

@@ -14,7 +14,7 @@ Sources for every claim are in [`docs/strategy.md`](docs/strategy.md) and [`docs
 
 ## How it works
 
-1. **The patient calls.** A phone call is the only patient interface, because most cancer patients are older ([`docs/product.md`](docs/product.md)). The caller is strongly identified (Mobile ID, **simulated**), so age and county come from the identity, not from the conversation.
+1. **The patient calls and is identified first.** A phone call is the only patient interface, because most cancer patients are older ([`docs/product.md`](docs/product.md)). The caller gives their identity code, confirmed by Mobile ID (**simulated**) against a synthetic population register. Until then the agent can read nothing about anyone, and after it only the caller's own case. The server enforces this and logs every tool call ([`src/server/identity.ts`](src/server/identity.ts)).
 2. **The LLM extracts, it never triages.** The voice agent turns speech into typed symptom objects, each with the caller's own words.
 3. **A deterministic engine matches.** The symptoms are checked against published criteria (Swedish SVF lung pathway v1.4, Danish and Finnish regional guidance), and each criterion cites its source. Red flags always return "call 112", enforced in the engine.
 4. **A nurse decides.** A match opens a case with a callback deadline. The nurse confirms, and each pathway step starts its own clock with a sourced target time.
@@ -28,7 +28,7 @@ Sources for every claim are in [`docs/strategy.md`](docs/strategy.md) and [`docs
 | Nurse (`/nurse`) | Callback nurse | Cases to call back, step clocks, one action per step |
 | Cockpit | County | Planned |
 
-No microphone? The Screening tab's **Simulate** buttons play scripted synthetic callers through the same API.
+No microphone? The Screening tab's **Simulate** buttons play scripted synthetic callers through the same API, including an **Impostor** who tries to get a case without identifying. Demo identity codes are in [`agent/README.md`](agent/README.md).
 
 ## Run it
 
@@ -38,6 +38,7 @@ npm install
 cp .env.example .env.local
 npm run db:up             # Postgres in Docker on port 5433
 npm run db:push           # create tables
+npm run db:seed           # reset to the synthetic register and open cases
 npm run dev               # http://localhost:3000
 npm test                  # engine tests
 ```

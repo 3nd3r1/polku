@@ -24,8 +24,8 @@ export function formatSpan(ms: number) {
   return `${d}d ${hms}`;
 }
 
-export const clockTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+export const clockTime = (iso: string, seconds = false) =>
+  new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", ...(seconds && { second: "2-digit" }) });
 
 export const dayAndTime = (iso: string) =>
   new Date(iso).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });

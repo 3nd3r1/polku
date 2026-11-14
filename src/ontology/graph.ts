@@ -103,7 +103,7 @@ export function buildGraph(people: readonly Person[], calls: CallView[], cases: 
 
   for (const person of people) {
     const k = key("Person", person.id);
-    objects.push({ key: k, type: "Person", title: person.name, subtitle: person.county, provenance: "synthetic", props: { born: person.birthYear, phone: person.phone } });
+    objects.push({ key: k, type: "Person", title: person.name, subtitle: person.county, provenance: "synthetic", props: { born: person.birthDate, phone: person.phone } });
     const county = countyByName(person.county);
     if (county) link("lives_in", k, key("County", county.id));
   }

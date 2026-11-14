@@ -1,21 +1,50 @@
-import { jsonb, pgTable, serial, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, pgTable, serial, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import type { Outcome } from "../ontology/engine";
 import type { Intake } from "../ontology/schema";
 import type { Person } from "../sim/people";
 
 export const CHANNELS = ["web_call", "phone", "sample"] as const;
-export const CALL_STATUSES = ["ringing", "verifying", "verified", "screened"] as const;
+export const CALL_STATUSES = ["ringing", "verifying", "verified", "screened", "ended"] as const;
+export const TOOLS = ["verify_identity", "get_case", "record_intake"] as const;
 export const CASE_STATUSES = ["pending_review", "active", "dismissed", "completed", "advised"] as const;
 
-/** A phone call: strong identification first, then the intake. */
+/** Population register. SYNTHETIC: test-range identity codes only (see src/sim/people.ts). */
+export const people = pgTable("people", {
+  id: text("id").primaryKey(),
+  hetu: text("hetu").notNull().unique(),
+  name: text("name").notNull(),
+  birthDate: date("birth_date").notNull(),
+  county: text("county").notNull(),
+  phone: text("phone").notNull(),
+});
+
+/** A phone call: strong identification first, then the case, then the intake. */
 export const calls = pgTable("calls", {
   id: uuid("id").primaryKey().defaultRandom(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   status: text("status", { enum: CALL_STATUSES }).notNull(),
-  /** Set by strong identification. Synthetic in the demo. */
+  /** Set only by strong identification. Nothing about any person is readable before it. */
+  personId: text("person_id").references(() => people.id),
   person: jsonb("person").$type<Person>(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  failedVerifications: integer("failed_verifications").notNull().default(0),
+  /** The case this call read, opened or updated. */
+  caseId: uuid("case_id"),
+  /** What the caller was told on this call. */
+  outcome: text("outcome").$type<Outcome>(),
   transcript: jsonb("transcript").$type<TranscriptLine[]>().notNull().default([]),
+});
+
+/** Every tool call the agent makes, allowed or refused, and why. Append-only. */
+export const accessLog = pgTable("access_log", {
+  id: serial("id").primaryKey(),
+  callId: uuid("call_id")
+    .notNull()
+    .references(() => calls.id, { onDelete: "cascade" }),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  tool: text("tool", { enum: TOOLS }).notNull(),
+  allowed: boolean("allowed").notNull(),
+  detail: text("detail").notNull(),
 });
 
 export type TranscriptLine = { role: "agent" | "caller"; text: string; at: string };
@@ -26,6 +55,7 @@ export const cases = pgTable("cases", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   channel: text("channel", { enum: CHANNELS }).notNull(),
   callId: uuid("call_id").references(() => calls.id, { onDelete: "set null" }),
+  personId: text("person_id").references(() => people.id),
   person: jsonb("person").$type<Person>(),
   county: text("county"),
   pathwayId: text("pathway_id").notNull(),

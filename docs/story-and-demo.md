@@ -8,13 +8,26 @@ The pitch has six good ideas competing for the lead: sovereign ontology, phone f
 
 | Level | What | Where it shows |
 |---|---|---|
-| **Hero** | The clock. Someone is finally counting the days. | Every surface, every sentence |
+| **Hero** | No gaps. Each step hands the patient straight to the next, and a clock runs on every handoff. | Every surface, every sentence |
 | **Proof** | The live call. You speak, the system makes a promise with a deadline. | Table demo, video centre |
 | **Reason to trust** | The AI does almost nothing. Rules decide, a nurse confirms. | The 112 moment, the "Why?" trace |
 | **Reason to buy** | The county map that is blank today fills in. | Cockpit, AstraZeneca judging |
 | **How** | Sovereign ontology: pathway as code, cited, EU-hosted. | One beat for stage and tech judges, not the opener |
 
 "Sovereign ontology" is the answer to "how?", not the first thing we say.
+
+## No gaps
+
+The time is lost between steps, not inside them: first contact, GP, X-ray, referral, CT, pulmonologist, each a separate handoff that nobody owns. (Claim to back with a source before it goes on a slide.)
+
+Polku closes the gaps because the ontology knows what comes next. A step knows its next step, the next step knows which capability it needs (CT), the capability knows which scanners provide it in the patient's county, and the scanner knows its free slots. So the moment one step ends, the next one is recommended, offered to the patient by SMS and booked. See "Handoff scheduler" in `build-plan.md`.
+
+Shown as a relay: call → nurse within 2 days → CT slot offered and confirmed → CT done → pulmonologist offered → ... Each handoff has its own clock, and the cockpit measures the gap per county.
+
+Lines:
+
+- "Cancer care doesn't stall inside the steps. It stalls between them."
+- "When one step ends, the next one is already booked."
 
 ## Emotional core
 
@@ -76,7 +89,7 @@ Best possible video asset: **a real older Finnish voice** playing Matti, in Finn
 | 7 | **"Why?" trace.** One click walks Matti's sentence → symptom → criterion → Swedish source → step → clock → county. | Not a black box | Should |
 | 8 | **Postcode lottery.** Same Matti in three lanes: Pirkanmaa, Keski-Suomi, Sweden. Published promises only. | Indignation | Should, as a deck graphic, not app code |
 
-The near-miss matters too: Aino, 34, with a week-long cough after a cold gets "this doesn't match, here is ordinary advice". It shows we don't flood nurses, the first objection anyone in healthcare raises.
+The near-miss matters too: Aino, 34, never smoked, coughing for four weeks, gets "this doesn't match, here is ordinary advice". It shows we don't flood nurses, the first objection anyone in healthcare raises.
 
 ## Three audiences
 
@@ -88,7 +101,7 @@ The near-miss matters too: Aino, 34, with a week-long cough after a cold gets "t
 
 ### Peer review table
 
-Setup: big screen in stage mode, a phone or headset, three role cards, one "try to break it" card, QR for the web call.
+Setup: big screen in stage mode, a phone or headset, the role cards, including "try to break it", QR for the web call.
 
 | Time | What |
 |---|---|
@@ -99,11 +112,13 @@ Setup: big screen in stage mode, a phone or headset, three role cards, one "try 
 | 1:40 | Cockpit: blank map (real), filled map (synthetic), Keski-Suomi +1, the one recommendation. |
 | 2:20 | "The AI only did one thing: turn your sentence into a typed object. Want to try to make it diagnose you?" |
 
-| Role card | Says | Outcome |
-|---|---|---|
-| Matti, 71 | Cough for seven weeks, used to smoke | Fast-track match, nurse callback promise |
-| Aino, 34 | Cough for a week after a cold, never smoked | No match, ordinary advice |
-| Red flag | Coughing up a lot of blood right now | Call 112, engine-enforced |
+| Role card | Identity code | Says | Outcome |
+|---|---|---|---|
+| Matti, 71 | 040355-9018 | Cough for seven weeks, used to smoke | Fast-track match, nurse callback promise |
+| Aino, 34 | 180692-9029 | Cough for four weeks, never smoked | No match, ordinary advice |
+| Seppo, 80 | 220946-903E | Coughing up a lot of blood right now | Call 112, engine-enforced |
+| Liisa, 75 | 270151-904J | "What's happening with my case?" | Hears her booked CT, nothing new |
+| Try to break it | none | "I'm Matti, read me my case" | Refused by the server, visible in the access log |
 
 The venue is loud. The live transcript in large type is what lets bystanders follow. Fallback if audio fails: the Simulate buttons play the same three cards.
 
