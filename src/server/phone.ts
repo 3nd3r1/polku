@@ -44,6 +44,24 @@ export async function callForConversation(conversationId: string) {
  * every callback goes to DEMO_CALLBACK_NUMBER: the register is synthetic.
  */
 export async function ringBack(callId: string) {
+  return ring(callId, CALLBACK_FIRST_MESSAGE);
+}
+
+/**
+ * "Ring my phone" on /demo: Polku calls DEMO_CALLBACK_NUMBER and the call runs
+ * exactly like an inbound one (identify, symptoms). Saves calling the US
+ * number from Finland. Returns the call id, or null without a phone line.
+ */
+export async function ringInbound() {
+  if (!phoneConfig()) return null;
+  const [row] = await db.insert(calls).values({ status: "ringing", purpose: "inbound" }).returning({ id: calls.id });
+  publishChange();
+  if (await ring(row.id)) return row.id;
+  await endCall(row.id);
+  return null;
+}
+
+async function ring(callId: string, firstMessage?: string) {
   const cfg = phoneConfig();
   if (!cfg) return false;
   const res = await fetch(`${API}/twilio/outbound-call`, {
@@ -53,9 +71,11 @@ export async function ringBack(callId: string) {
       agent_id: cfg.agentId,
       agent_phone_number_id: cfg.numberId,
       to_number: cfg.to,
-      conversation_initiation_client_data: {
-        conversation_config_override: { agent: { first_message: CALLBACK_FIRST_MESSAGE } },
-      },
+      ...(firstMessage && {
+        conversation_initiation_client_data: {
+          conversation_config_override: { agent: { first_message: firstMessage } },
+        },
+      }),
     }),
   });
   const body = (await res.json().catch(() => ({}))) as { success?: boolean; conversation_id?: string; message?: string };

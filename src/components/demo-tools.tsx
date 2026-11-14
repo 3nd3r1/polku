@@ -58,6 +58,15 @@ export function DemoTools() {
     router.push("/");
   }
 
+  const [ringState, setRingState] = useState<string | null>(null);
+  async function ringMe() {
+    setRingState("Ringing");
+    const r = await post("/api/calls/ring");
+    if (!r.callId) return setRingState(r.error ?? "Could not ring the phone");
+    setRingState(null);
+    router.push("/");
+  }
+
   async function reset() {
     setResetState("Resetting");
     const res = await fetch("/api/admin/reset", {
@@ -127,12 +136,23 @@ export function DemoTools() {
             note="A browser call stands in for the phone line. Say one of these identity codes when asked."
           >
             {phone.available ? (
-              <button
-                onClick={phone.live ? phone.end : callTheLine}
-                className={`h-11 px-5 text-sm ${phone.live ? "border border-alert text-alert" : "bg-fg text-black hover:bg-white"}`}
-              >
-                {phone.live ? "Hang up" : "Call the line from this browser"}
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={phone.live ? phone.end : callTheLine}
+                  className={`h-11 px-5 text-sm ${phone.live ? "border border-alert text-alert" : "bg-fg text-black hover:bg-white"}`}
+                >
+                  {phone.live ? "Hang up" : "Call the line from this browser"}
+                </button>
+                <button
+                  onClick={ringMe}
+                  disabled={ringState === "Ringing"}
+                  className="h-11 border border-line px-5 text-sm hover:border-fg disabled:opacity-50"
+                  title="Polku calls the demo phone (DEMO_CALLBACK_NUMBER) and takes a normal call on it"
+                >
+                  Ring my phone
+                </button>
+                {ringState && <span className="text-sm text-muted">{ringState}</span>}
+              </div>
             ) : (
               <p className="text-sm text-dim">
                 No voice agent configured (NEXT_PUBLIC_ELEVENLABS_AGENT_ID). Use

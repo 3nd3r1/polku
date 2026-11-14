@@ -9,6 +9,10 @@
 - Speak **English**.
 - Watch it live on production: https://prod-polku.eros.ender.fi (password `PROD_SITE_PASSWORD` in `.env.local`, any user name). **Calls** shows the call as it happens, **Tasks** gets the nurse task.
 
+### Free: let Polku ring you
+
+Calling the US number costs about 0.48 €/min on Elisa. Instead, open https://prod-polku.eros.ender.fi/demo (not linked in the nav on production) and press **Ring my phone**. Polku calls `DEMO_CALLBACK_NUMBER` from the Twilio number, paid from Twilio credit, and the call runs exactly like an inbound one: same greeting, same codes, same script below. Press any key for the trial notice first.
+
 ## Identity codes
 
 The agent asks for your personal identity code first. Use only these. They're synthetic (individual number 900-999, never issued to real people).
