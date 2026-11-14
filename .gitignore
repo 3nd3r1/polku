@@ -43,3 +43,6 @@ next-env.d.ts
 
 # direnv
 .direnv/
+
+# Tools built by shell.nix
+/.bin/
