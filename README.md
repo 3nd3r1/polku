@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  < href="docs/Polku-white-paper.pdf"><b>Read our research paper here</b></a>
+  <a href="docs/Polku-white-paper.pdf"><b>Read our research paper here</b></a>
   &nbsp;(<a href="docs/Polku-white-paper-print.pdf">print version</a>)
 </p>
 
