@@ -124,6 +124,12 @@ function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call:
   const criterion = lung.criteria.find((x) => x.id === c.matches[0]?.criterionId);
   const source = criterion && lung.sources.find((s) => s.id === criterion.sourceId);
   const name = firstName(c);
+  // One source line for the whole task: the criterion that matched and the step's time limit.
+  const limit = `${cal.maxDays} day limit`;
+  const sources =
+    source?.url === cal.source.url
+      ? [{ ...cal.source, what: `criterion, ${limit}` }]
+      : [...(source ? [{ name: source.name, url: source.url, what: "criterion" }] : []), { ...cal.source, what: limit }];
   const step = STEP_LABEL[cal.stepId];
   const sessions = cal.days.flatMap((d) => d.sessions);
   const booked = sessions.find((s) => s.state === "booked");
@@ -167,16 +173,7 @@ function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call:
         <p className="mt-1 text-muted">
           {[c.intake.age, c.county, SMOKING_LABEL[c.intake.smoking]].filter((x) => x !== undefined && x !== null).join(" · ")}
         </p>
-        {criterion && (
-          <p className="mt-3 text-sm">
-            {criterion.gloss}.
-            {source && (
-              <a href={source.url} target="_blank" rel="noreferrer" className="ml-2 text-info hover:underline">
-                Source: {source.name}
-              </a>
-            )}
-          </p>
-        )}
+        {criterion && <p className="mt-3 text-sm">{criterion.gloss}.</p>}
       </header>
 
       {booked ? (
@@ -198,38 +195,24 @@ function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call:
         </section>
       ) : (
         <section className="border-t border-line pt-6">
-          <p className="label">{offered.length ? "Offered to the patient" : mode === "self" ? "Pick the time you agreed" : "Proposed by the rules"}</p>
-          <p className="mt-2 text-sm text-muted">
-            Earliest free {step.toLowerCase()} times at {cal.path?.facility ?? "the unit"} before the limit, {when(cal.dueAt)} ({cal.maxDays} days,{" "}
-            <a href={cal.source.url} target="_blank" rel="noreferrer" className="text-info hover:underline">
-              {cal.source.name}
-            </a>
-            ).
+          <p className="label">
+            {offered.length ? `Offered to ${name}` : mode === "self" ? "Pick the time you agreed" : mode === "change" ? "Pick up to three times" : "Proposed times"}
           </p>
-          {mode === "accept" && (
+          <p className="mt-2 text-sm text-muted">
+            {step} at {cal.path?.facility ?? "the unit"}, by {when(cal.dueAt)}.
+          </p>
+          {mode === "accept" || decided ? (
             <ul className="mt-4 border-t border-line">
-              {proposing.map((at, i) => (
+              {proposing.map((at) => (
                 <li key={at} className="flex items-baseline gap-4 border-b border-line py-3">
-                  <span className="font-mono text-xs text-dim">{i + 1}</span>
                   <span className="text-xl font-light">{when(at)}</span>
-                  <span className={`text-sm ${new Date(at) <= new Date(cal.dueAt) ? "text-ok" : "text-warn"}`}>
-                    {new Date(at) <= new Date(cal.dueAt) ? "before the limit" : "after the limit"}
-                  </span>
+                  {new Date(at) > new Date(cal.dueAt) && <span className="text-sm text-warn">after the limit</span>}
                 </li>
               ))}
-              {proposing.length === 0 && <li className="py-3 text-sm text-alert">No free time. Change times or call {name} yourself.</li>}
+              {proposing.length === 0 && <li className="py-3 text-sm text-alert">No free time. Call {name} yourself.</li>}
             </ul>
-          )}
-          {mode !== "accept" && !decided && (
-            <>
-              <Calendar cal={cal} picked={picked} onPick={toggle} />
-              <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-dim">
-                <Key className="bg-raised" label="Taken" />
-                <Key className="border border-line-strong" label="Free" />
-                <Key className="bg-fg" label={mode === "self" ? "Picked" : "Proposed"} />
-                <span>Limit {when(cal.dueAt)}</span>
-              </p>
-            </>
+          ) : (
+            <FreeTimes cal={cal} picked={picked} onPick={toggle} />
           )}
 
           {!decided && (
@@ -268,7 +251,7 @@ function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call:
                   </button>
                   {mode === "accept" ? (
                     <button onClick={() => setMode("change")} className="text-sm text-muted hover:text-fg">
-                      Change times
+                      Other times
                     </button>
                   ) : (
                     <button onClick={() => setMode("accept")} className="text-sm text-muted hover:text-fg">
@@ -286,132 +269,85 @@ function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call:
         </section>
       )}
 
-      {call && <CallProgress call={call} times={proposing} live={phone.live && phone.callId === call.id} onHangUp={phone.end} />}
+      {call && !booked && <CallStatus call={call} name={name} live={phone.live && phone.callId === call.id} onHangUp={phone.end} />}
+
+      {sources.length > 0 && (
+        <p className="border-t border-line pt-4 text-xs text-dim">
+          Sources:{" "}
+          {sources.map((x, i) => (
+            <span key={x.url}>
+              {i > 0 && ", "}
+              <a href={x.url} target="_blank" rel="noreferrer" className="hover:text-fg">
+                {x.name}
+              </a>{" "}
+              ({x.what})
+            </span>
+          ))}
+        </p>
+      )}
     </div>
   );
 }
 
-function Key({ className, label }: { className: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className={`h-2.5 w-2.5 ${className}`} aria-hidden />
-      {label}
-    </span>
-  );
-}
-
-/** Two weeks of the resource's sessions. Click free ones to change what is proposed. */
-function Calendar({ cal, picked, onPick }: { cal: CalendarView; picked: string[]; onPick?: (at: string) => void }) {
-  const times = [...new Set(cal.days.flatMap((d) => d.sessions.map((s) => clockTime(s.at))))].sort();
+/** Free times as plain buttons, one row per day. On-time ones only, unless there are none. */
+function FreeTimes({ cal, picked, onPick }: { cal: CalendarView; picked: string[]; onPick: (at: string) => void }) {
   const due = new Date(cal.dueAt);
+  const free = cal.days.map((d) => ({ date: d.date, sessions: d.sessions.filter((x) => x.state === "free") }));
+  const onTime = free.map((d) => ({ ...d, sessions: d.sessions.filter((x) => new Date(x.at) <= due) }));
+  const days = (onTime.some((d) => d.sessions.length) ? onTime : free).filter((d) => d.sessions.length);
   return (
-    <div className="mt-3 overflow-x-auto">
-      <table className="w-full border-collapse font-mono text-xs tabular-nums">
-        <thead>
-          <tr>
-            <th className="w-14" />
-            {cal.days.map((d) => {
-              const late = new Date(d.date) > due;
-              return (
-                <th key={d.date} className={`h-9 border-b border-line px-1 text-left font-normal ${late ? "text-dim" : "text-muted"}`}>
-                  {day(d.date)}
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {times.map((t) => (
-            <tr key={t}>
-              <td className="pr-2 text-dim">{t}</td>
-              {cal.days.map((d) => {
-                const s = d.sessions.find((x) => clockTime(x.at) === t);
-                if (!s) return <td key={d.date} className="h-10 border border-line/40" />;
-                const isPicked = picked.includes(s.at);
-                const late = new Date(s.at) > due;
-                const cls =
-                  s.state === "booked"
-                    ? "bg-ok text-black"
-                    : s.state === "offered" || isPicked
-                      ? "bg-fg text-black"
-                      : s.state === "free"
-                        ? `border border-line-strong ${late ? "text-dim" : "text-muted"} ${onPick ? "cursor-pointer hover:border-fg hover:text-fg" : ""}`
-                        : s.state === "taken"
-                          ? "bg-raised"
-                          : "";
-                return (
-                  <td key={d.date} className="h-10 p-0.5">
-                    <button
-                      type="button"
-                      disabled={s.state !== "free" || !onPick}
-                      onClick={() => onPick?.(s.at)}
-                      className={`flex h-full w-full items-center px-2 ${cls}`}
-                    >
-                      {s.state === "booked" ? "Booked" : s.state === "offered" || isPicked ? "Proposed" : s.state === "free" ? (late ? "late" : "free") : ""}
-                    </button>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="mt-4 border-t border-line">
+      {days.map((d) => (
+        <li key={d.date} className="flex items-center gap-4 border-b border-line py-2">
+          <span className="w-24 shrink-0 text-sm text-muted">{day(d.date)}</span>
+          <div className="flex flex-wrap gap-2">
+            {d.sessions.map((x) => (
+              <button
+                key={x.at}
+                type="button"
+                onClick={() => onPick(x.at)}
+                className={`h-9 px-3 font-mono text-sm ${
+                  picked.includes(x.at) ? "bg-fg text-black" : "border border-line-strong text-muted hover:border-fg hover:text-fg"
+                }`}
+              >
+                {clockTime(x.at)}
+              </button>
+            ))}
+          </div>
+        </li>
+      ))}
+      {days.length === 0 && <li className="py-3 text-sm text-alert">No free time.</li>}
+    </ul>
   );
 }
 
-/** The callback as it happens: what the agent was allowed to do, and what was said. */
-function CallProgress({ call, times, live, onHangUp }: { call: CallView; times: string[]; live: boolean; onHangUp: () => void }) {
-  const log = (tool: string) => call.access.filter((e) => e.tool === tool);
-  const verify = log("verify_identity").at(-1);
-  const read = log("get_case").find((e) => e.verdict === "allowed");
-  const book = log("book_time").find((e) => e.verdict === "allowed");
-  const steps: { label: string; state: "done" | "now" | "failed" | "todo"; detail?: string }[] = [
-    { label: `Calling ${call.case?.person?.phone ?? ""}`, state: call.transcript.length ? "done" : "now" },
-    {
-      label: "Identity",
-      state: call.person ? "done" : call.status === "verifying" ? "now" : verify?.verdict === "refused" ? "failed" : "todo",
-      detail: call.person ? "Confirmed with Mobile ID" : call.status === "verifying" ? "Waiting for Mobile ID" : verify?.detail,
-    },
-    { label: `${times.length} times read out`, state: read ? "done" : "todo", detail: times.map((t) => when(t)).join(", ") },
-    { label: "Patient's choice", state: book ? "done" : read ? "now" : "todo", detail: book?.detail },
-  ];
-  const color = { done: "bg-ok", now: "bg-warn animate-pulse", failed: "bg-alert", todo: "bg-line-strong" };
+/** Where the callback is right now, in one line. */
+function CallStatus({ call, name, live, onHangUp }: { call: CallView; name: string; live: boolean; onHangUp: () => void }) {
+  const allowed = (tool: string) => call.access.some((e) => e.tool === tool && e.verdict === "allowed");
+  const refused = call.access.filter((e) => e.tool === "verify_identity").at(-1)?.verdict === "refused";
+  const ended = call.status === "ended";
+  const [text, tone] = ended
+    ? [!call.person && refused ? "The call ended. Identity was not confirmed." : `The call ended without a booking. Call ${name} yourself.`, "text-alert"]
+    : allowed("get_case")
+      ? [`Reading the times out to ${name}.`, ""]
+      : call.person
+        ? ["Identity confirmed with Mobile ID.", ""]
+        : call.status === "verifying"
+          ? [`Waiting for ${name} to confirm with Mobile ID.`, ""]
+          : call.transcript.length
+            ? [`${name} answered. Checking identity.`, ""]
+            : [`Polku is calling ${name} on ${call.case?.person?.phone ?? "their phone"}.`, ""];
   return (
-    <section className="grid gap-8 border-t border-line pt-6 lg:grid-cols-2">
-      <div>
-        <div className="flex items-center justify-between">
-          <p className="label">Callback {clockTime(call.startedAt)}</p>
-          {live && (
-            <button onClick={onHangUp} className="text-sm text-alert">
-              Hang up
-            </button>
-          )}
-        </div>
-        <ol className="mt-3 border-t border-line">
-          {steps.map((s) => (
-            <li key={s.label} className="flex gap-3 border-b border-line py-3">
-              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 ${color[s.state]}`} aria-hidden />
-              <div>
-                <p className={`text-sm ${s.state === "todo" ? "text-dim" : ""}`}>{s.label}</p>
-                {s.detail && s.state !== "todo" && (
-                  <p className={`mt-0.5 text-sm ${s.state === "failed" ? "text-alert" : "text-muted"}`}>{s.detail}</p>
-                )}
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-      <ol className="flex flex-col gap-2">
-        {call.transcript.map((t, i) => (
-          <li
-            key={i}
-            className={`max-w-[90%] px-3 py-2 text-sm ${t.role === "caller" ? "self-end bg-raised" : "border border-line text-muted"}`}
-          >
-            {t.text}
-          </li>
-        ))}
-      </ol>
+    <section className="flex items-center justify-between gap-4 border-t border-line pt-6">
+      <p className={`flex items-center gap-3 text-sm ${tone}`}>
+        <span className={`h-2.5 w-2.5 shrink-0 ${ended ? "bg-alert" : "animate-pulse bg-warn"}`} aria-hidden />
+        {text}
+      </p>
+      {live && (
+        <button onClick={onHangUp} className="text-sm text-alert">
+          Hang up
+        </button>
+      )}
     </section>
   );
 }

@@ -22,7 +22,7 @@ The demo moment is the phone ringing back. A judge makes the call, accepts the t
 | Element       | Where it stands                                                                                                                                                         |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The call      | Built. Handoff packet fills during the call (symptoms with the caller's words, what's still missing, criterion with one source line), full-screen "Call 112", "Handed to the nurse, due ...". |
-| Task view     | Built. One task per patient, rule-proposed times, Accept or "I'll call myself" (nurse books directly). Calendar only behind "Change times".                             |
+| Task view     | Built. One task per patient, rule-proposed times, Accept or "I'll call myself" (nurse books directly). Free times as plain buttons behind "Other times". One source line per task. The callback shows as one status line.                             |
 | Callback      | Built. Accept starts the browser callback; `book_time` books the pick. Browser call only, no real phone yet.                                                            |
 | Handoff strip | Built at `/handoffs`. One line per patient, holder and deadline per handoff, parts of the record each step opened, full access log per patient (`record_access`).       |
 
