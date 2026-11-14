@@ -149,7 +149,9 @@ function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call:
     setError(null);
     const r = await post(`/api/cases/${c.id}/propose`, { times: picked });
     if (!r.callId) return setError(r.error ?? "Could not start the callback");
-    if (phone.available) {
+    if (r.phone) {
+      // The server rang the patient's real phone; the call shows up here as it goes.
+    } else if (phone.available) {
       if (!phone.live) phone.start(r.callId, CALLBACK_FIRST_MESSAGE);
     } else {
       // No voice agent (the public demo site): a scripted patient answers, through the same API.

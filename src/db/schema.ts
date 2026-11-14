@@ -42,6 +42,8 @@ export const calls = pgTable("calls", {
   transcript: jsonb("transcript").$type<TranscriptLine[]>().notNull().default([]),
   /** The handoff packet as it fills: the last intake the agent sent and what was still missing. */
   draft: jsonb("draft").$type<{ intake: Intake; gaps: Gap[] }>(),
+  /** ElevenLabs conversation id, on real phone calls only. Ties the agent's webhook tools to this call. */
+  conversationId: text("conversation_id").unique(),
 });
 
 /** Every tool call the agent makes, allowed or refused, and why. Append-only. */

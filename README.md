@@ -49,6 +49,8 @@ Without npm: `docker compose --env-file .env.local up --build`.
 
 Voice calls need an ElevenLabs agent, see `agent/README.md`.
 
+The real phone line is a Twilio number on ElevenLabs answered by "Polku Phone", a copy of the agent whose tools are webhooks to `/api/phone/[tool]` on production. `npm run agent:phone` (after `agent:push`) creates or updates it and points the number at it. When the nurse accepts times, production rings `DEMO_CALLBACK_NUMBER`. The Twilio account is a trial: it only calls verified numbers and plays a trial notice first (press any key).
+
 ## Deploy
 
 Pushing to main deploys through Coolify (Dockerfile build, Aiven Postgres). The container creates the schema and seeds on first boot.

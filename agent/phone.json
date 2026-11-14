@@ -1,0 +1,10 @@
+{
+  "tools": {
+    "book_time": "tool_1701m7d4vegfev4v48g6rrpgqey1",
+    "get_case": "tool_6801m7d4ve3afrdsdhf6w0kspyca",
+    "record_intake": "tool_8801m7d4ve9kfkn9nyssb9gchkvf",
+    "verify_identity": "tool_7301m7d4vdvbewgvqbr7np1ptjp6"
+  },
+  "agentId": "agent_8301m7d4vxmpeqgrcw4w9ta8bv96",
+  "phoneNumberId": "phnum_1101m7d38ry2f3sb68nr7matw3np"
+}

@@ -15,6 +15,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "agent:push": "tsx agent/sync.ts && cd agent && elevenlabs tools push && elevenlabs agents push",
     "start:prod": "drizzle-kit push --force && tsx src/db/seed.ts --if-empty && next start -H 0.0.0.0 -p 3000",
+    "agent:phone": "tsx --env-file=.env.local agent/phone.mts",
     "deploy": "coolify deploy uuid d44cwwc4ssc8kwgg8gogs840",
     "deploy:demo": "coolify deploy uuid ecgg88wg0owook0oggcwc84o",
     "demo:reset": "tsx src/db/reset.ts"
