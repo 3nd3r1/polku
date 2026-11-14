@@ -1,4 +1,5 @@
-# Local dev database. Production uses Aiven Postgres via DATABASE_URL.
+# Local stack: `npm run up` starts Postgres and the app on http://localhost:3000.
+# Production uses the same Dockerfile on Coolify, with Aiven Postgres via DATABASE_URL.
 services:
   db:
     image: postgres:16-alpine
@@ -10,5 +11,26 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U polku -d polku"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # The production build. Creates the schema and seeds the synthetic register on first boot.
+  app:
+    build:
+      context: .
+      args:
+        # Public agent id, read from .env.local by `npm run up`. Empty hides the call button.
+        NEXT_PUBLIC_ELEVENLABS_AGENT_ID: ${NEXT_PUBLIC_ELEVENLABS_AGENT_ID:-}
+    environment:
+      DATABASE_URL: postgres://polku:polku@db:5432/polku
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:

@@ -38,6 +38,15 @@ npm run dev               # http://localhost:3000
 npm test
 ```
 
+Or everything in Docker, Postgres and the production build with schema and seed included:
+
+```sh
+cp .env.example .env.local   # once
+npm run up                   # http://localhost:3000
+```
+
+Without npm: `docker compose --env-file .env.local up --build`.
+
 Voice calls need an ElevenLabs agent, see `agent/README.md`.
 
 ## Deploy
