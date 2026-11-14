@@ -55,7 +55,7 @@ Pushing to main deploys through Coolify (Dockerfile build, Aiven Postgres). The 
 
 ```sh
 npm run deploy            # manual redeploy if the webhook fails
-npm run demo:reset        # wipe and reseed production, needs ADMIN_TOKEN in .env.local
+npm run demo:reset        # wipe and reseed local and production (or: demo:reset local, demo:reset prod)
 npm run agent:push        # push prompt and tools to ElevenLabs
 ```
 
