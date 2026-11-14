@@ -52,6 +52,19 @@ describe.skipIf(!process.env.DATABASE_URL)("access gate", () => {
     expect(row.personId).toBeNull();
   });
 
+  it("asks for a missing detail twice at most, then records with the gap left for the nurse", async () => {
+    const call = await newCall();
+    await identify(call, A.hetu);
+    const vague: Intake = { smoking: "current", observations: [{ code: "CHEST_PAIN", quote: "it's really hurting" }] };
+    await expect(submitIntake(vague, "sample", call)).rejects.toMatchObject({ status: 422 });
+    await expect(submitIntake(vague, "sample", call)).rejects.toMatchObject({ status: 422 });
+    await expect(submitIntake(vague, "sample", call)).resolves.toHaveProperty("sayThis");
+    const [row] = await db.select().from(calls).where(eq(calls.id, call));
+    expect(row.outcome).not.toBeNull();
+    expect(row.draft?.gaps.length).toBeGreaterThan(0);
+    await db.delete(cases).where(eq(cases.personId, A.id));
+  });
+
   it("refuses invalid and unknown codes, then locks the call", async () => {
     const call = await newCall();
     await expect(verifyIdentity(call, "Testi Alfa")).rejects.toMatchObject({ status: 422 });

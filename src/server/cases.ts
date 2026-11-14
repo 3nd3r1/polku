@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
-import { audit, calls, type CASE_STATUSES, cases, clocks, type CHANNELS } from "../db/schema";
+import { accessLog, audit, calls, type CASE_STATUSES, cases, clocks, type CHANNELS } from "../db/schema";
 import { gapQuestion, gaps } from "../ontology/clarity";
 import { evaluate, sayThis, type Outcome } from "../ontology/engine";
 import { shortDayTime, spokenDayTime, STEP_LABEL, STEP_SPOKEN } from "../ontology/labels";
@@ -127,6 +127,16 @@ async function offerTimes(callId: string, caseId: string, clock: Clock, slots: {
  * criterion matches). A caller with an open case gets the symptoms added to it.
  * Age comes from the verified identity, never from the LLM.
  */
+const MAX_ASKS = 2;
+
+async function asksSoFar(callId: string) {
+  const rows = await db
+    .select({ id: accessLog.id })
+    .from(accessLog)
+    .where(and(eq(accessLog.callId, callId), eq(accessLog.tool, "record_intake"), eq(accessLog.verdict, "ask")));
+  return rows.length;
+}
+
 export async function submitIntake(raw: Intake, channel: (typeof CHANNELS)[number], callId: string) {
   const { call, person } = await requireIdentified(callId, "record_intake");
   if (call.outcome) {
@@ -139,11 +149,17 @@ export async function submitIntake(raw: Intake, channel: (typeof CHANNELS)[numbe
   await db.update(calls).set({ draft: { intake, gaps: missing } }).where(eq(calls.id, callId));
 
   // The intake must be clear enough to evaluate. The agent asks, then calls again.
+  // After MAX_ASKS rounds it is evaluated as it is: the caller has answered and the
+  // model failed to fill it in, so asking again only loops. The gaps stay on the
+  // packet for the nurse, who confirms every case anyway.
   const questions = missing.map(gapQuestion);
-  if (questions.length > 0) {
+  if (questions.length > 0 && (await asksSoFar(callId)) < MAX_ASKS) {
     await logAccess(callId, "record_intake", "ask", `Not clear yet. ${questions.join(" ")}`);
     publishChange();
-    throw new ActionError(`Not recorded yet. ${questions.join(" ")} Then call record_intake again with everything.`, 422);
+    throw new ActionError(
+      `Not recorded yet. ${questions.join(" ")} Then call record_intake again with everything: put each answer on the matching observation (durationDays, knownCause). Smoking goes only in the smoking field, never as an observation.`,
+      422,
+    );
   }
 
   const evaluation = evaluate(intake, lung);
