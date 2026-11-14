@@ -6,9 +6,8 @@
 import { sql } from "drizzle-orm";
 import { evaluate } from "../ontology/engine";
 import type { Intake } from "../ontology/schema";
-import { STAFF_ONLY_STEPS } from "../ontology/labels";
 import { lung } from "../pathways/lung";
-import { recommendSlot } from "../sim/capacity";
+import { ontologyPath, resourceCalendar, resourcesFor } from "../sim/capacity";
 import { ageOf, type Person, syntheticPeople } from "../sim/people";
 import { db } from "./index";
 import { audit, cases, clocks, people } from "./schema";
@@ -18,21 +17,31 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const INTAKES: Omit<Intake, "age">[] = [
   { smoking: "former", observations: [{ code: "COUGH_NEW", durationDays: 49, quote: "I've had this cough for about seven weeks" }] },
   { smoking: "current", observations: [{ code: "HAEMOPTYSIS", quote: "there was blood when I coughed" }] },
+  { smoking: "former", observations: [{ code: "HAEMOPTYSIS_REPEATED", quote: "I keep coughing up a bit of blood, it's happened several times" }] },
   { smoking: "current", observations: [{ code: "DYSPNOEA_NEW", durationDays: 45, quote: "I get out of breath on the stairs now" }] },
   { smoking: "never", observations: [{ code: "CHEST_PAIN", quote: "a pain in my chest that won't go away" }] },
 ];
 
-/** Where the running step stands: booked by staff, SMS offered recently, or SMS offered over 24 h ago with no reply. */
-type Plan = "booked" | "offered" | "no_reply";
 type CaseSeed = {
   person: Person;
   intake: Omit<Intake, "age">;
   stepIndex: number;
   daysIntoStep: number;
   booked?: { inDays: number; at: string; unit: string };
-  plan?: Plan;
+  /** Book the running step in the first free session (other patients' bookings fill the calendars). */
+  book?: boolean;
 };
-const PLANS: (Plan | undefined)[] = ["booked", "offered", "no_reply", undefined, "booked", "offered", undefined, "booked"];
+/** Which step each generated case is at: mostly new referrals and CT, a few further along. */
+const STEPS = [0, 1, 1, 0, 1, 3, 1, 0, 4, 1, 2, 1, 5, 0, 1, 6, 1];
+
+/** The i-th intake in rotation that fast-tracks for this person (age matters for some criteria). */
+function fastTrackIntake(person: Person, i: number) {
+  for (let k = 0; k < INTAKES.length; k++) {
+    const intake = INTAKES[(i + k) % INTAKES.length];
+    if (evaluate({ ...intake, age: ageOf(person) }, lung).outcome === "fast_track") return intake;
+  }
+  throw new Error(`No seed intake fast-tracks for ${person.id}`);
+}
 
 /** Deterministic: same cases on every seed. Some prior steps overran, so some promises are already broken. */
 function caseSeeds(people: Person[]): CaseSeed[] {
@@ -44,12 +53,13 @@ function caseSeeds(people: Person[]): CaseSeed[] {
     .filter((p) => p.id.startsWith("p"))
     .filter((_, i) => i % 3 === 0)
     .forEach((person, i) => {
+      const stepIndex = STEPS[i % STEPS.length];
       seeds.push({
         person,
-        intake: INTAKES[i % INTAKES.length],
-        stepIndex: i % (lung.steps.length - 1),
-        daysIntoStep: (i * 7) % 9,
-        plan: PLANS[i % PLANS.length],
+        intake: fastTrackIntake(person, i),
+        stepIndex,
+        daysIntoStep: stepIndex === 0 ? (i % 4) * 0.3 : (i * 7) % 9,
+        book: stepIndex > 1 || i % 3 === 2,
       });
     });
   return seeds;
@@ -69,6 +79,7 @@ export async function resetDemo() {
   await db.insert(people).values(register);
 
   const seeds = caseSeeds(register);
+  const taken = new Set<string>();
   for (const s of seeds) {
     const intake: Intake = { ...s.intake, age: ageOf(s.person) };
     const evaluation = evaluate(intake, lung);
@@ -110,22 +121,18 @@ export async function resetDemo() {
       const booked = current && s.booked;
       let scheduledAt: Date | null = null;
       let unit: string | null = null;
-      let offeredAt: Date | null = null;
-      let offeredSlot: { at: string; unit: string } | null = null;
       if (booked) {
         scheduledAt = new Date(now + booked.inDays * DAY_MS);
         const [h, m] = booked.at.split(":").map(Number);
         scheduledAt.setHours(h, m, 0, 0);
         unit = booked.unit;
-      } else if (current && j > 0 && s.plan) {
-        const slot = recommendSlot(s.person.county, step.id, dueAt, new Date(now));
-        if (slot && s.plan === "booked") {
-          scheduledAt = new Date(slot.at);
-          unit = slot.unit;
-        } else if (slot && !STAFF_ONLY_STEPS.includes(step.id)) {
-          // Staff-only steps are booked by staff, never offered to the patient.
-          offeredAt = new Date(now - (s.plan === "offered" ? 6 : 30) * 60 * 60 * 1000);
-          offeredSlot = { at: slot.at, unit: slot.unit };
+      } else if (current && s.book) {
+        const [r] = resourcesFor(s.person.county, step.id);
+        const free = r && resourceCalendar(r, new Date(now)).flatMap((d) => d.sessions).find((x) => !x.taken && !taken.has(`${r.id}@${x.at}`));
+        if (r && free) {
+          taken.add(`${r.id}@${free.at}`);
+          scheduledAt = new Date(free.at);
+          unit = ontologyPath(r).facility;
         }
       }
       await db.insert(clocks).values({
@@ -134,8 +141,6 @@ export async function resetDemo() {
         startedAt,
         dueAt,
         stoppedAt,
-        offeredAt,
-        offeredSlot,
         scheduledAt,
         unit,
       });

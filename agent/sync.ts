@@ -58,6 +58,8 @@ config.workflow = workflow();
 config.conversation_config.conversation.max_duration_seconds = 300;
 config.platform_settings.call_limits.daily_limit = 300;
 config.platform_settings.auth.enable_auth = false; // the Screening page connects with the agent id only
+// The Nurse page starts callbacks with CALLBACK_FIRST_MESSAGE instead of the inbound greeting.
+config.platform_settings.overrides.conversation_config_override.agent.first_message = true;
 writeJson(agent.config, config);
 
 console.log(`Synced ${AGENT_TOOLS.length} tools and ${agent.config}`);
@@ -116,22 +118,30 @@ function workflow() {
         "2 Check case",
         "Step 2: the caller is identified. Greet them by first name and call get_case. If they have an open case, tell them the returned sentence word for word and ask whether anything is new or worse.",
         420,
-        ["case_to_symptoms", "case_to_end"],
+        ["case_to_book", "case_to_symptoms", "case_to_end"],
         "get_case",
+      ),
+      book: agentNode(
+        "3 Book a time",
+        "get_case read out numbered times. Ask which one suits the caller, then call book_time with that number, or 0 if none suits. Say the returned sentence word for word and end the call.",
+        640,
+        ["book_to_end"],
       ),
       symptoms: agentNode(
         "3 Record symptoms",
         "Step 3: ask about symptoms, how long, any known cause, and smoking. Call record_intake, ask what it says is missing, and say the returned sentence word for word.",
-        640,
+        860,
         ["symptoms_to_end"],
       ),
-      end_node: end(0, 860),
-      end_early: end(360, 640),
+      end_node: end(0, 1080),
+      end_early: end(360, 860),
     },
     edges: {
       start_to_identify: edge("start_node", "identify", null),
       identify_to_case: edge("identify", "check_case", "verify_identity confirmed the caller's identity"),
       identify_to_end: edge("identify", "end_early", "The caller was told to call 112, or identification is locked after three failed attempts"),
+      case_to_book: edge("check_case", "book", "get_case returned numbered times for the caller to choose from"),
+      book_to_end: edge("book", "end_node", "The sentence returned by book_time has been said to the caller"),
       case_to_symptoms: edge("check_case", "symptoms", "The caller has no open case, or reports something new or worse"),
       case_to_end: edge("check_case", "end_early", "The caller heard their case status and has nothing new to report"),
       symptoms_to_end: edge("symptoms", "end_node", "The sentence returned by record_intake has been said to the caller"),

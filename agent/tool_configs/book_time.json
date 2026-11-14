@@ -1,0 +1,15 @@
+{
+    "description": "book_time client tool",
+    "dynamic_variables": {
+        "dynamic_variable_placeholders": {}
+    },
+    "expects_response": false,
+    "name": "book_time",
+    "parameters": {
+        "description": "Parameters for the client tool",
+        "properties": {},
+        "type": "object"
+    },
+    "response_timeout_secs": 30,
+    "type": "client"
+}

@@ -1,59 +1,47 @@
 "use client";
 
+import { ConversationProvider } from "@elevenlabs/react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { SMOKING_LABEL, STAFF_ONLY_STEPS, STEP_LABEL, SYMPTOM_LABEL, formatDuration } from "@/ontology/labels";
+import { SMOKING_LABEL, STEP_LABEL } from "@/ontology/labels";
 import { lung } from "@/pathways/lung";
-import type { CaseView, ClockView } from "@/server/cases";
-import { day, formatSpan, shortSpan, useNow, when } from "./time";
+import { CALLBACK_FIRST_MESSAGE } from "@/server/agent-tools";
+import type { CallView } from "@/server/calls";
+import type { CaseView } from "@/server/cases";
+import type { CalendarView, Priority, WorkItem } from "@/server/schedule";
+import { pause, post, useAgentCall } from "./agent-call";
+import { clockTime, day, when } from "./time";
 
-const HOUR_MS = 60 * 60 * 1000;
-const NO_REPLY_MS = 24 * HOUR_MS;
-
-/** Nurse work only: fast-track cases. 112 and advice-only calls never reach this list. */
-const isNurseCase = (c: CaseView) => c.outcome === "fast_track" && (c.status === "pending_review" || c.status === "active");
-const running = (c: CaseView) => c.clocks.find((k) => k.stoppedAt === null);
-const firstName = (c: CaseView) => c.person?.name.split(" ")[0] ?? "the caller";
-
-type Group = "call" | "schedule" | "waiting" | "booked";
-const GROUPS: { id: Group; title: string }[] = [
-  { id: "call", title: "Call back" },
-  { id: "schedule", title: "Schedule" },
-  { id: "waiting", title: "Waiting for reply" },
-  { id: "booked", title: "Booked" },
-];
-
-function groupOf(c: CaseView): Group {
-  const k = running(c);
-  if (c.status === "pending_review" || !k) return "call";
-  if (k.scheduledAt) return "booked";
-  if (k.offeredAt) return "waiting";
-  return "schedule";
-}
-
-/** When the list sorts this case: the appointment once booked, otherwise the step's due time. */
-const sortKey = (c: CaseView) => {
-  const k = running(c);
-  return k ? new Date(k.scheduledAt ?? k.dueAt).getTime() : 0;
+const PRIORITY: Record<Priority, { label: string; color: string }> = {
+  risk: { label: "At risk", color: "bg-alert" },
+  high: { label: "High", color: "bg-warn" },
+  routine: { label: "Routine", color: "bg-line-strong" },
 };
-
-async function act(id: string, action: string) {
-  const res = await fetch(`/api/cases/${id}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action }),
-  });
-  if (!res.ok) console.error("Case action failed", action, (await res.json().catch(() => null))?.error);
-}
+const firstName = (c: CaseView) => c.person?.name.split(" ")[0] ?? "the patient";
 
 export function NurseInbox() {
-  const [cases, setCases] = useState<CaseView[] | null>(null);
+  return (
+    <ConversationProvider>
+      <NurseInner />
+    </ConversationProvider>
+  );
+}
+
+function NurseInner() {
+  const [items, setItems] = useState<WorkItem[] | null>(null);
+  const [calls, setCalls] = useState<CallView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(useSearchParams().get("case"));
-  const now = useNow();
+  // Every patient seen, so the selected one stays on screen after booking, when they leave the list.
+  const [seen, setSeen] = useState<Record<string, WorkItem>>({});
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/cases", { cache: "no-store" });
-    if (res.ok) setCases((await res.json()).filter(isNurseCase));
+    const [w, c] = await Promise.all([fetch("/api/worklist", { cache: "no-store" }), fetch("/api/calls", { cache: "no-store" })]);
+    if (w.ok) {
+      const list: WorkItem[] = await w.json();
+      setItems(list);
+      setSeen((prev) => ({ ...prev, ...Object.fromEntries(list.map((i) => [i.case.id, i])) }));
+    }
+    if (c.ok) setCalls(await c.json());
   }, []);
 
   useEffect(() => {
@@ -62,281 +50,313 @@ export function NurseInbox() {
     return () => events.close();
   }, [refresh]);
 
-  const sorted = [...(cases ?? [])].sort((a, b) => sortKey(a) - sortKey(b));
-  const selected = sorted.find((c) => c.id === selectedId) ?? sorted[0];
+  const selected = (selectedId && (items?.find((i) => i.case.id === selectedId) ?? seen[selectedId])) || items?.[0];
 
   return (
     <div className="flex min-h-0 flex-1">
       <aside className="flex w-80 shrink-0 flex-col border-r border-line">
+        <p className="label flex h-11 shrink-0 items-center justify-between border-b border-line px-5">
+          <span>To book, most urgent first</span>
+          <span className="text-dim">{items?.length ?? ""}</span>
+        </p>
         <div className="flex-1 overflow-y-auto">
-          {cases?.length === 0 && <p className="p-5 text-sm text-dim">No patients waiting.</p>}
-          {GROUPS.map((g) => {
-            const rows = sorted.filter((c) => groupOf(c) === g.id);
-            if (rows.length === 0) return null;
-            return (
-              <section key={g.id}>
-                <p className="label flex h-11 items-center justify-between border-b border-line px-5">
-                  <span>{g.title}</span>
-                  <span className="text-dim">{rows.length}</span>
-                </p>
-                {rows.map((c) => (
-                  <Row key={c.id} c={c} now={now} selected={c.id === selected?.id} onClick={() => setSelectedId(c.id)} />
-                ))}
-              </section>
-            );
-          })}
+          {items?.length === 0 && <p className="p-5 text-sm text-dim">Everyone is booked.</p>}
+          {items?.map((it) => (
+            <button
+              key={it.case.id}
+              onClick={() => setSelectedId(it.case.id)}
+              className={`flex w-full gap-3 border-b border-line px-5 py-3 text-left ${
+                it.case.id === selected?.case.id ? "bg-raised" : "hover:bg-panel"
+              }`}
+            >
+              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 ${PRIORITY[it.priority].color}`} aria-hidden />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-sm">{it.case.person?.name ?? "Unknown"}</span>
+                  <span className="shrink-0 font-mono text-xs text-muted">
+                    {STEP_LABEL[it.calendar.stepId]} by {day(it.calendar.dueAt).slice(4)}
+                  </span>
+                </div>
+                <p className={`mt-0.5 truncate text-xs ${it.priority === "risk" ? "text-alert" : "text-muted"}`}>{it.reason}</p>
+              </div>
+            </button>
+          ))}
         </div>
-        <p className="label border-t border-line px-5 py-3">Synthetic patients and slots</p>
+        <p className="label border-t border-line px-5 py-3">Synthetic patients and calendars</p>
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">
-        {selected && <CaseDetail key={selected.id} c={selected} now={now} />}
+        {selected && (
+          <Booking
+            key={selected.case.id}
+            item={selected}
+            onAct={() => setSelectedId(selected.case.id)}
+            rank={items ? items.findIndex((i) => i.case.id === selected.case.id) + 1 : 0}
+            call={calls.find((c) => c.purpose === "callback" && c.case?.id === selected.case.id) ?? null}
+          />
+        )}
       </main>
     </div>
   );
 }
 
-function Row({ c, now, selected, onClick }: { c: CaseView; now: number | null; selected: boolean; onClick: () => void }) {
-  const k = running(c);
-  if (!k) return null;
-  const left = now === null ? null : new Date(k.dueAt).getTime() - now;
-  const noReply = k.offeredAt && !k.scheduledAt && now !== null && now - new Date(k.offeredAt).getTime() > NO_REPLY_MS;
+function Booking({ item, rank, call, onAct }: { item: WorkItem; rank: number; call: CallView | null; onAct: () => void }) {
+  const c = item.case;
+  const [fetched, setFetched] = useState<CalendarView | null>(null);
+  const cal = rank > 0 ? item.calendar : (fetched ?? item.calendar);
+  const [picked, setPicked] = useState<string[]>(item.calendar.suggested);
+  const agent = useAgentCall();
 
-  let right: React.ReactNode = null;
-  if (k.scheduledAt) right = <span className="text-muted">{when(k.scheduledAt)}</span>;
-  else if (noReply) right = <span className="text-warn">No reply</span>;
-  else if (left !== null)
-    right = <span className={left < 0 ? "text-alert" : left < HOUR_MS * 12 ? "text-warn" : "text-muted"}>{left < 0 ? `${shortSpan(left)} over` : shortSpan(left)}</span>;
+  // Once booked the patient leaves the list; their calendar is fetched directly so the booking shows.
+  useEffect(() => {
+    if (rank > 0) return;
+    fetch(`/api/cases/${c.id}/calendar`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setFetched);
+  }, [c.id, rank, call]);
+
+  const criterion = lung.criteria.find((x) => x.id === c.matches[0]?.criterionId);
+  const source = criterion && lung.sources.find((s) => s.id === criterion.sourceId);
+  const name = firstName(c);
+  const step = STEP_LABEL[cal.stepId];
+  const sessions = cal.days.flatMap((d) => d.sessions);
+  const booked = sessions.find((s) => s.state === "booked");
+  const offered = sessions.filter((s) => s.state === "offered").map((s) => s.at);
+  const proposing = offered.length > 0 ? offered : picked;
+
+  function toggle(at: string) {
+    setPicked((p) => (p.includes(at) ? p.filter((x) => x !== at) : p.length < 3 ? [...p, at].sort() : p));
+  }
+
+  async function propose(simulate: boolean) {
+    onAct();
+    const r = await post(`/api/cases/${c.id}/propose`, { times: picked });
+    if (!r.callId) return console.error(r.error);
+    if (simulate || !agent.available) simulateCallback(r.callId, c);
+    else agent.start(r.callId, CALLBACK_FIRST_MESSAGE);
+  }
 
   return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center justify-between gap-3 border-b border-line px-5 py-3 text-left ${
-        selected ? "bg-raised" : "hover:bg-panel"
-      }`}
-    >
-      <div className="min-w-0">
-        <p className="truncate text-sm">{c.person?.name ?? "Unknown"}</p>
-        <p className="text-xs text-muted">{STEP_LABEL[k.stepId]}</p>
-      </div>
-      <span className="shrink-0 font-mono text-xs tabular-nums">{right}</span>
-    </button>
-  );
-}
-
-function CaseDetail({ c, now }: { c: CaseView; now: number | null }) {
-  const p = c.person;
-  return (
-    <div className="flex max-w-3xl flex-col gap-10 px-8 py-10">
+    <div className="flex flex-col gap-8 px-8 py-8">
       <header>
-        <h1 className="text-3xl font-light">{p?.name ?? "Unknown"}</h1>
+        {rank > 0 && (
+          <p className="label flex items-center gap-2">
+            <span className={`h-2.5 w-2.5 ${PRIORITY[item.priority].color}`} aria-hidden />
+            Priority {rank} · {PRIORITY[item.priority].label}
+          </p>
+        )}
+        <h1 className="mt-2 text-3xl font-light">{c.person?.name ?? "Unknown"}</h1>
         <p className="mt-1 text-muted">
-          {[c.intake.age !== undefined && `${c.intake.age}`, c.county, SMOKING_LABEL[c.intake.smoking]].filter(Boolean).join(" · ")}
+          {[c.intake.age, c.county, SMOKING_LABEL[c.intake.smoking]].filter((x) => x !== undefined && x !== null).join(" · ")}
         </p>
+        {criterion && (
+          <p className="mt-3 text-sm">
+            {criterion.gloss}
+            {source && (
+              <a href={source.url} target="_blank" rel="noreferrer" className="ml-2 text-info hover:underline">
+                {source.spokenName.replace(/^the /, "")}
+              </a>
+            )}
+          </p>
+        )}
       </header>
-      <NextStep c={c} now={now} />
-      <Pathway c={c} now={now} />
+
+      <section>
+        {cal.path && (
+          <p className="font-mono text-xs text-muted">
+            {step} within {cal.maxDays} days <span className="text-dim">→</span> {cal.path.capability}{" "}
+            <span className="text-dim">→</span> {cal.path.resource} <span className="text-dim">→</span> {cal.path.facility},{" "}
+            {cal.path.county}
+          </p>
+        )}
+        <Calendar cal={cal} picked={booked || offered.length ? [] : picked} onPick={booked || offered.length ? undefined : toggle} />
+        <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-dim">
+          <Key className="bg-raised" label="Taken" />
+          <Key className="border border-line-strong" label="Free" />
+          <Key className="bg-fg" label="Proposed" />
+          <Key className="bg-ok" label="Booked" />
+          <span>Limit {when(cal.dueAt)}</span>
+        </p>
+      </section>
+
+      {booked ? (
+        <section className="border-t border-line pt-6">
+          <p className="label">Booked</p>
+          <p className="mt-2 text-2xl font-light">
+            {step} {when(booked.at)}, {cal.path?.facility}
+          </p>
+          <p className={`mt-1 text-sm ${new Date(booked.at) <= new Date(cal.dueAt) ? "text-ok" : "text-warn"}`}>
+            {new Date(booked.at) <= new Date(cal.dueAt) ? "Within the time limit." : "After the time limit."} {name} picked it on the call.
+          </p>
+        </section>
+      ) : call && call.status !== "ended" ? null : (
+        <section className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-6">
+          <button
+            onClick={() => propose(false)}
+            disabled={picked.length === 0 || agent.live}
+            className="h-11 bg-fg px-5 text-sm text-black hover:bg-white disabled:opacity-40"
+          >
+            Call {name} and propose {picked.length === 1 ? "this time" : `these ${picked.length} times`}
+          </button>
+          {agent.available && (
+            <button onClick={() => propose(true)} disabled={picked.length === 0} className="text-sm text-muted hover:text-fg">
+              Play the call
+            </button>
+          )}
+          <p className="basis-full text-sm text-muted">
+            Polku calls {c.person?.phone}, checks it is {name} with Mobile ID, reads the times and books the one {name} picks.
+          </p>
+        </section>
+      )}
+
+      {call && <CallProgress call={call} times={proposing} live={agent.live} onHangUp={agent.end} />}
     </div>
   );
 }
 
-/** The one thing to do now, with one button. */
-function NextStep({ c, now }: { c: CaseView; now: number | null }) {
-  const [busy, setBusy] = useState(false);
-  const k = running(c);
-  if (!k) return null;
-  const run = (action: string) => async () => {
-    setBusy(true);
-    await act(c.id, action);
-    setBusy(false);
-  };
-  const step = STEP_LABEL[k.stepId];
-  const name = firstName(c);
+function Key({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={`h-2.5 w-2.5 ${className}`} aria-hidden />
+      {label}
+    </span>
+  );
+}
 
-  // 1. Call the patient back and decide.
-  if (c.status === "pending_review") {
-    const criterion = lung.criteria.find((x) => x.id === c.matches[0]?.criterionId);
-    return (
-      <Panel title="Now" due={k} now={now}>
-        <p className="text-2xl font-light">Call {name} back</p>
-        <p className="mt-1 font-mono text-muted">{c.person?.phone}</p>
-        <ul className="mt-5 flex flex-col gap-1 text-sm">
-          {c.intake.observations.map((o, i) => (
-            <li key={i}>
-              {SYMPTOM_LABEL[o.code]}
-              {o.durationDays !== undefined && <span className="text-muted">, {formatDuration(o.durationDays)}</span>}
+/** Two weeks of the resource's sessions. Click free ones to change what is proposed. */
+function Calendar({ cal, picked, onPick }: { cal: CalendarView; picked: string[]; onPick?: (at: string) => void }) {
+  const times = [...new Set(cal.days.flatMap((d) => d.sessions.map((s) => clockTime(s.at))))].sort();
+  const due = new Date(cal.dueAt);
+  return (
+    <div className="mt-3 overflow-x-auto">
+      <table className="w-full border-collapse font-mono text-xs tabular-nums">
+        <thead>
+          <tr>
+            <th className="w-14" />
+            {cal.days.map((d) => {
+              const late = new Date(d.date) > due;
+              return (
+                <th key={d.date} className={`h-9 border-b border-line px-1 text-left font-normal ${late ? "text-dim" : "text-muted"}`}>
+                  {day(d.date)}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {times.map((t) => (
+            <tr key={t}>
+              <td className="pr-2 text-dim">{t}</td>
+              {cal.days.map((d) => {
+                const s = d.sessions.find((x) => clockTime(x.at) === t);
+                if (!s) return <td key={d.date} className="h-10 border border-line/40" />;
+                const isPicked = picked.includes(s.at);
+                const late = new Date(s.at) > due;
+                const cls =
+                  s.state === "booked"
+                    ? "bg-ok text-black"
+                    : s.state === "offered" || isPicked
+                      ? "bg-fg text-black"
+                      : s.state === "free"
+                        ? `border border-line-strong ${late ? "text-dim" : "text-muted"} ${onPick ? "cursor-pointer hover:border-fg hover:text-fg" : ""}`
+                        : s.state === "taken"
+                          ? "bg-raised"
+                          : "";
+                return (
+                  <td key={d.date} className="h-10 p-0.5">
+                    <button
+                      type="button"
+                      disabled={s.state !== "free" || !onPick}
+                      onClick={() => onPick?.(s.at)}
+                      className={`flex h-full w-full items-center px-2 ${cls}`}
+                    >
+                      {s.state === "booked" ? "Booked" : s.state === "offered" || isPicked ? "Proposed" : s.state === "free" ? (late ? "late" : "free") : ""}
+                    </button>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** The callback as it happens: what the agent was allowed to do, and what was said. */
+function CallProgress({ call, times, live, onHangUp }: { call: CallView; times: string[]; live: boolean; onHangUp: () => void }) {
+  const log = (tool: string) => call.access.filter((e) => e.tool === tool);
+  const verify = log("verify_identity").at(-1);
+  const read = log("get_case").find((e) => e.verdict === "allowed");
+  const book = log("book_time").find((e) => e.verdict === "allowed");
+  const steps: { label: string; state: "done" | "now" | "failed" | "todo"; detail?: string }[] = [
+    { label: `Calling ${call.case?.person?.phone ?? ""}`, state: call.transcript.length ? "done" : "now" },
+    {
+      label: "Identity",
+      state: call.person ? "done" : call.status === "verifying" ? "now" : verify?.verdict === "refused" ? "failed" : "todo",
+      detail: call.person ? "Confirmed with Mobile ID" : call.status === "verifying" ? "Waiting for Mobile ID" : verify?.detail,
+    },
+    { label: `${times.length} times read out`, state: read ? "done" : "todo", detail: times.map((t) => when(t)).join(", ") },
+    { label: "Patient's choice", state: book ? "done" : read ? "now" : "todo", detail: book?.detail },
+  ];
+  const color = { done: "bg-ok", now: "bg-warn animate-pulse", failed: "bg-alert", todo: "bg-line-strong" };
+  return (
+    <section className="grid gap-8 border-t border-line pt-6 lg:grid-cols-2">
+      <div>
+        <div className="flex items-center justify-between">
+          <p className="label">Callback {clockTime(call.startedAt)}</p>
+          {live && (
+            <button onClick={onHangUp} className="text-sm text-alert">
+              Hang up
+            </button>
+          )}
+        </div>
+        <ol className="mt-3 border-t border-line">
+          {steps.map((s) => (
+            <li key={s.label} className="flex gap-3 border-b border-line py-3">
+              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 ${color[s.state]}`} aria-hidden />
+              <div>
+                <p className={`text-sm ${s.state === "todo" ? "text-dim" : ""}`}>{s.label}</p>
+                {s.detail && s.state !== "todo" && (
+                  <p className={`mt-0.5 text-sm ${s.state === "failed" ? "text-alert" : "text-muted"}`}>{s.detail}</p>
+                )}
+              </div>
             </li>
           ))}
-        </ul>
-        {criterion && <p className="mt-3 text-sm text-muted">Matched: {criterion.gloss}</p>}
-        <Buttons>
-          <Primary onClick={run("confirm")} busy={busy}>
-            Refer to CT
-          </Primary>
-          <Secondary onClick={run("dismiss")} busy={busy}>
-            Not needed
-          </Secondary>
-        </Buttons>
-      </Panel>
-    );
-  }
-
-  // 4. Booked: done when it has happened.
-  if (k.scheduledAt) {
-    return (
-      <Panel title="Now" due={k} now={now}>
-        <p className="text-2xl font-light">
-          {step} {when(k.scheduledAt)}
-        </p>
-        {k.unit && <p className="mt-1 text-muted">{k.unit}</p>}
-        <Buttons>
-          <Primary onClick={run("advance")} busy={busy}>
-            Mark done
-          </Primary>
-        </Buttons>
-      </Panel>
-    );
-  }
-
-  // 3. SMS sent, waiting for YES.
-  if (k.offeredAt && k.offeredSlot) {
-    const noReply = now !== null && now - new Date(k.offeredAt).getTime() > NO_REPLY_MS;
-    return (
-      <Panel title="Now" due={k} now={now}>
-        <p className="text-2xl font-light">{noReply ? `No reply from ${name}` : `Waiting for ${name}`}</p>
-        <Sms at={k.offeredAt} text={smsText(step, k.offeredSlot)} />
-        <Buttons>
-          {noReply && (
-            <Primary onClick={run("book")} busy={busy}>
-              Book it and call {name}
-            </Primary>
-          )}
-          {noReply ? (
-            <Secondary onClick={run("reply")} busy={busy}>
-              {name} replied YES
-            </Secondary>
-          ) : (
-            <Primary onClick={run("reply")} busy={busy}>
-              {name} replied YES
-            </Primary>
-          )}
-        </Buttons>
-        <p className="mt-3 text-xs text-dim">SMS simulated</p>
-      </Panel>
-    );
-  }
-
-  // 2. Pick the time: the system recommends one, the nurse sends it to the patient (or books staff-only steps).
-  const slot = c.recommended;
-  const staffOnly = STAFF_ONLY_STEPS.includes(k.stepId);
-  return (
-    <Panel title="Now" due={k} now={now}>
-      <p className="label">Recommended {step}</p>
-      {slot ? (
-        <>
-          <p className="mt-3 text-2xl font-light">{when(slot.at)}</p>
-          <p className="mt-1 text-muted">{slot.unit}</p>
-          <p className={`mt-1 text-sm ${slot.onTime ? "text-ok" : "text-warn"}`}>
-            {slot.onTime ? "Within the time limit" : "After the time limit. Earliest free slot."}
-          </p>
-          <Buttons>
-            {staffOnly ? (
-              <Primary onClick={run("book")} busy={busy}>
-                Book
-              </Primary>
-            ) : (
-              <Primary onClick={run("offer")} busy={busy}>
-                Propose to {name}
-              </Primary>
-            )}
-          </Buttons>
-        </>
-      ) : (
-        <p className="mt-3 text-muted">No free slot in the next weeks.</p>
-      )}
-    </Panel>
-  );
-}
-
-const smsText = (step: string, slot: { at: string; unit: string }) =>
-  `Your ${step} time: ${when(slot.at)}, ${slot.unit}. Reply YES to confirm, or call us to change it.`;
-
-function Sms({ at, text }: { at: string; text: string }) {
-  return (
-    <div className="mt-5 max-w-md border border-line px-4 py-3">
-      <p className="label">SMS sent {when(at)}</p>
-      <p className="mt-2 text-sm">{text}</p>
-    </div>
-  );
-}
-
-function Panel({ title, due, now, children }: { title: string; due: ClockView; now: number | null; children: React.ReactNode }) {
-  const left = now === null ? null : new Date(due.dueAt).getTime() - now;
-  return (
-    <section className="border border-line bg-panel p-6">
-      <div className="mb-5 flex items-baseline justify-between gap-4">
-        <p className="label">{title}</p>
-        <p className="font-mono text-sm tabular-nums">
-          <span className="text-muted">Due {when(due.dueAt)} </span>
-          {left !== null && <span className={left < 0 ? "text-alert" : "text-ok"}>{formatSpan(left)} {left < 0 ? "over" : "left"}</span>}
-        </p>
+        </ol>
       </div>
-      {children}
-    </section>
-  );
-}
-
-const Buttons = ({ children }: { children: React.ReactNode }) => <div className="mt-6 flex flex-wrap gap-3">{children}</div>;
-
-function Primary({ onClick, busy, children }: { onClick: () => void; busy: boolean; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} disabled={busy} className="h-11 bg-fg px-5 text-sm text-black hover:bg-white disabled:opacity-50">
-      {children}
-    </button>
-  );
-}
-
-function Secondary({ onClick, busy, children }: { onClick: () => void; busy: boolean; children: React.ReactNode }) {
-  return (
-    <button onClick={onClick} disabled={busy} className="h-11 border border-line-strong px-5 text-sm hover:bg-raised disabled:opacity-50">
-      {children}
-    </button>
-  );
-}
-
-/** The whole pathway as a schedule: what happened, what is booked, what is due. */
-function Pathway({ c, now }: { c: CaseView; now: number | null }) {
-  return (
-    <section>
-      <p className="label">Pathway</p>
-      <ol className="mt-3 border-t border-line">
-        {lung.steps.map((s) => {
-          const k = c.clocks.find((x) => x.stepId === s.id);
-          const kept = k?.stoppedAt ? k.stoppedAt <= k.dueAt : null;
-          const late = k && !k.stoppedAt && now !== null && new Date(k.dueAt).getTime() < now;
-          const marker = !k ? "bg-line-strong" : k.stoppedAt ? (kept ? "bg-ok" : "bg-alert") : late ? "bg-alert" : "bg-fg";
-          return (
-            <li key={s.id} className="flex h-11 items-center gap-4 border-b border-line text-sm">
-              <span className={`h-2.5 w-2.5 shrink-0 ${marker}`} aria-hidden />
-              <span className={`flex-1 ${k ? "" : "text-muted"}`}>{STEP_LABEL[s.id]}</span>
-              <span className="font-mono text-xs tabular-nums">
-                {!k ? (
-                  <span className="text-dim">within {s.maxDays} d</span>
-                ) : k.stoppedAt ? (
-                  <>
-                    <span className="text-muted">Done {day(k.stoppedAt)} </span>
-                    <span className={kept ? "text-ok" : "text-alert"}>{kept ? "kept" : "broken"}</span>
-                  </>
-                ) : k.scheduledAt ? (
-                  <span>Booked {when(k.scheduledAt)}</span>
-                ) : (
-                  <span className={late ? "text-alert" : ""}>Due {when(k.dueAt)}</span>
-                )}
-              </span>
-            </li>
-          );
-        })}
+      <ol className="flex flex-col gap-2">
+        {call.transcript.map((t, i) => (
+          <li
+            key={i}
+            className={`max-w-[90%] px-3 py-2 text-sm ${t.role === "caller" ? "self-end bg-raised" : "border border-line text-muted"}`}
+          >
+            {t.text}
+          </li>
+        ))}
       </ol>
     </section>
   );
+}
+
+/** Scripted callback for demos without a voice: same endpoints and the same gate as a live call. SYNTHETIC. */
+async function simulateCallback(callId: string, c: CaseView) {
+  const say = (role: "agent" | "caller", text: string) => post(`/api/calls/${callId}/transcript`, { role, text });
+  const first = firstName(c);
+  await say("agent", CALLBACK_FIRST_MESSAGE);
+  await pause(1800);
+  await say("caller", `Oh, hello. Yes, it's ${c.person?.hetu}.`);
+  await pause(800);
+  await post(`/api/calls/${callId}/verify`, { hetu: c.person?.hetu ?? "" });
+  await say("agent", `Thank you, ${first}.`);
+  await pause(1200);
+  const r = await post(`/api/calls/${callId}/case`);
+  await say("agent", r.summary ?? r.error);
+  await pause(2200);
+  await say("caller", "The first one is good for me.");
+  await pause(1000);
+  const b = await post(`/api/calls/${callId}/book`, { option: 1 });
+  await say("agent", `${b.summary ?? b.error} Goodbye, ${first}.`);
+  await pause(800);
+  await post(`/api/calls/${callId}/end`);
 }

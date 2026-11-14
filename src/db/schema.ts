@@ -5,7 +5,9 @@ import type { Person } from "../sim/people";
 
 export const CHANNELS = ["web_call", "phone", "sample"] as const;
 export const CALL_STATUSES = ["ringing", "verifying", "verified", "screened", "ended"] as const;
-export const TOOLS = ["verify_identity", "get_case", "record_intake"] as const;
+export const TOOLS = ["verify_identity", "get_case", "record_intake", "book_time"] as const;
+/** inbound: the patient called the line. callback: Polku calls the patient to book a time the nurse proposed. */
+export const CALL_PURPOSES = ["inbound", "callback"] as const;
 /** What the server decided on a tool call. "ask" = not clear enough yet, the agent asks again. */
 export const VERDICTS = ["allowed", "refused", "ask"] as const;
 export const CASE_STATUSES = ["pending_review", "active", "dismissed", "completed", "advised"] as const;
@@ -25,12 +27,13 @@ export const calls = pgTable("calls", {
   id: uuid("id").primaryKey().defaultRandom(),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   status: text("status", { enum: CALL_STATUSES }).notNull(),
+  purpose: text("purpose", { enum: CALL_PURPOSES }).notNull().default("inbound"),
   /** Set only by strong identification. Nothing about any person is readable before it. */
   personId: text("person_id").references(() => people.id),
   person: jsonb("person").$type<Person>(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   failedVerifications: integer("failed_verifications").notNull().default(0),
-  /** The case this call read, opened or updated. */
+  /** The case this call read, opened or updated. For a callback: the case it is about, set before anyone is identified. */
   caseId: uuid("case_id"),
   /** What the caller was told on this call. */
   outcome: text("outcome").$type<Outcome>(),
@@ -82,9 +85,9 @@ export const clocks = pgTable("clocks", {
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
-  /** Slot offered to the patient by SMS, waiting for their reply. */
+  /** Times the nurse proposed; Polku calls the patient, who picks one. Cleared when booked or declined. */
   offeredAt: timestamp("offered_at", { withTimezone: true }),
-  offeredSlot: jsonb("offered_slot").$type<{ at: string; unit: string }>(),
+  offeredSlots: jsonb("offered_slot").$type<{ at: string; unit: string }[]>(),
   /** Booked appointment for this step, if any. */
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   unit: text("unit"),

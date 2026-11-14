@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
-import { accessLog, calls, people, type TOOLS, type VERDICTS } from "../db/schema";
+import { accessLog, calls, cases, people, type TOOLS, type VERDICTS } from "../db/schema";
 import { maskHetu, parseHetu } from "../ontology/hetu";
 import { ageOf, type Person } from "../sim/people";
 import { publishChange } from "./bus";
@@ -100,6 +100,17 @@ export async function verifyIdentity(callId: string, spokenHetu: string) {
       `${maskHetu(parsed.hetu.code)} is not in the register`,
       "Identification failed. Ask the caller to check the code and say it again.",
     );
+  }
+
+  // A callback is for one person: anyone else who answers gets nothing.
+  if (call.purpose === "callback" && call.caseId) {
+    const [target] = await db.select({ personId: cases.personId }).from(cases).where(eq(cases.id, call.caseId));
+    if (target?.personId !== person.id) {
+      throw await fail(
+        "Not the person this call is for",
+        "This code is not the person this call is for. Share nothing. Ask to speak to the person the call is for.",
+      );
+    }
   }
 
   // The screen shows "waiting for Mobile ID" from this status; the log gets one row when it resolves.

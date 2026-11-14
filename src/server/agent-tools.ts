@@ -11,6 +11,10 @@ import { Intake } from "../ontology/schema";
 export const FIRST_MESSAGE =
   "Hi, this is Polku, the lung symptom line. I'm an AI assistant. To identify you, please tell me your personal identity code.";
 
+/** When Polku calls the patient back with times the nurse proposed. Sent as a first-message override. */
+export const CALLBACK_FIRST_MESSAGE =
+  "Hi, this is Polku calling from the lung symptom line, about booking your next appointment. I'm an AI assistant. To identify you, please tell me your personal identity code.";
+
 type JsonSchema = Record<string, unknown>;
 export type AgentTool = { name: string; description: string; parameters: JsonSchema };
 
@@ -41,6 +45,18 @@ export const AGENT_TOOLS: AgentTool[] = [
     description:
       "Record the caller's symptoms and smoking status once you have them. Returns the exact sentence to say back to the caller, or the questions still to ask.",
     parameters: z.toJSONSchema(Intake.omit({ age: true })) as JsonSchema,
+  },
+  {
+    name: "book_time",
+    description:
+      "After get_case has read out numbered times: book the one the caller chose. Option 0 means none of the times suits. Returns the sentence to say.",
+    parameters: {
+      type: "object",
+      properties: {
+        option: { type: "integer", description: "The number of the option the caller chose, or 0 if none suits." },
+      },
+      required: ["option"],
+    },
   },
 ];
 

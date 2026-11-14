@@ -8,7 +8,7 @@ import { type CaseView, toCaseViews } from "./cases";
 import { ActionError } from "./errors";
 
 export async function startCall() {
-  const [row] = await db.insert(calls).values({ status: "ringing" }).returning({ id: calls.id });
+  const [row] = await db.insert(calls).values({ status: "ringing", purpose: "inbound" }).returning({ id: calls.id });
   publishChange();
   return row.id;
 }
@@ -38,6 +38,7 @@ export type CallView = {
   id: string;
   startedAt: string;
   status: (typeof calls.$inferSelect)["status"];
+  purpose: (typeof calls.$inferSelect)["purpose"];
   person: Person | null;
   verifiedAt: string | null;
   outcome: Outcome | null;
@@ -59,6 +60,7 @@ export async function listCalls(limit = 30): Promise<CallView[]> {
     id: r.id,
     startedAt: r.startedAt.toISOString(),
     status: r.status,
+    purpose: r.purpose,
     person: r.person,
     verifiedAt: r.verifiedAt?.toISOString() ?? null,
     outcome: r.outcome,

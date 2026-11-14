@@ -14,6 +14,11 @@
             "type": "client",
             "config": "tool_configs/record_intake.json",
             "id": "tool_6401m7cjp64fennarxta7yfctxcx"
+        },
+        {
+            "type": "client",
+            "config": "tool_configs/book_time.json",
+            "id": "tool_8401m7cpwawmfabrf6dxa6zvvt4x"
         }
     ]
 }

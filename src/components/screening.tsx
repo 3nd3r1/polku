@@ -1,25 +1,15 @@
 "use client";
 
-import { ConversationProvider, useConversation, useConversationClientTool } from "@elevenlabs/react";
+import { ConversationProvider } from "@elevenlabs/react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AGENT_ID, pause, post, useAgentCall } from "./agent-call";
 import { STEP_LABEL } from "@/ontology/labels";
 import type { Intake } from "@/ontology/schema";
 import { lung } from "@/pathways/lung";
 import { ageOf } from "@/sim/people";
 import type { AccessEntry, CallView } from "@/server/calls";
 import { clockTime, formatSpan, useNow, when } from "./time";
-
-const AGENT_ID = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
-
-const post = async (url: string, body?: unknown) =>
-  (
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
-  ).json();
 
 type Turn =
   | { agent: string }
@@ -130,7 +120,6 @@ const SAMPLES: { label: string; script: Turn[] }[] = [
   },
 ];
 
-const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Plays a script at roughly speaking pace, through the same endpoints a live call uses. */
 async function simulateCall(s: (typeof SAMPLES)[number], onStarted: (id: string) => void) {
@@ -168,7 +157,6 @@ export function Screening() {
 function ScreeningInner() {
   const [calls, setCalls] = useState<CallView[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const liveCallId = useRef<string | null>(null); // read by the agent's tools
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/calls", { cache: "no-store" });
@@ -181,39 +169,13 @@ function ScreeningInner() {
     return () => events.close();
   }, [refresh]);
 
-  // Browser call stands in for the phone line in the demo.
-  const conversation = useConversation({
-    onMessage: (m) =>
-      liveCallId.current &&
-      post(`/api/calls/${liveCallId.current}/transcript`, {
-        role: m.role === "user" ? "caller" : "agent",
-        text: m.message,
-      }),
-    onDisconnect: () => {
-      if (liveCallId.current) post(`/api/calls/${liveCallId.current}/end`);
-    },
-  });
-  // The tools only forward to the server. The server decides what the agent may see.
-  useConversationClientTool("verify_identity", async (params) => {
-    const r = await post(`/api/calls/${liveCallId.current}/verify`, { hetu: String(params?.hetu ?? "") });
-    return r.sayThis ?? r.error;
-  });
-  useConversationClientTool("get_case", async () => {
-    const r = await post(`/api/calls/${liveCallId.current}/case`);
-    return r.sayThis ?? r.error;
-  });
-  useConversationClientTool("record_intake", async (params) => {
-    const r = await post(`/api/intake?channel=web_call&call=${liveCallId.current}`, params);
-    // On a gap the server says exactly what to ask next; the agent asks and calls again.
-    return r.sayThis ?? r.error;
-  });
-  const live = conversation.status === "connected" || conversation.status === "connecting";
+  const call = useAgentCall();
+  const live = call.live;
 
   async function startVoiceCall() {
     const { callId } = await post("/api/calls");
-    liveCallId.current = callId;
     setSelectedId(callId);
-    conversation.startSession({ agentId: AGENT_ID!, connectionType: "webrtc" });
+    call.start(callId);
   }
 
   const selected = calls?.find((c) => c.id === selectedId) ?? calls?.[0];
@@ -224,7 +186,7 @@ function ScreeningInner() {
         <div className="border-b border-line p-5">
           {AGENT_ID && (
             <button
-              onClick={live ? () => conversation.endSession() : startVoiceCall}
+              onClick={live ? call.end : startVoiceCall}
               className={`h-11 w-full text-sm ${live ? "bg-alert text-black" : "bg-fg text-black hover:bg-white"}`}
             >
               {live ? "Hang up" : "Call the line"}
@@ -278,6 +240,12 @@ function ScreeningInner() {
 }
 
 function callState(c: CallView): [string, string] {
+  if (c.purpose === "callback") {
+    const booked = c.access.find((e) => e.tool === "book_time" && e.verdict === "allowed");
+    if (booked) return [booked.detail, "text-ok"];
+    if (!c.person && c.access.some((e) => e.verdict === "refused")) return ["Callback: refused", "text-alert"];
+    return [c.status === "ended" ? "Callback ended" : "Callback", "text-warn"];
+  }
   const existing = c.case !== null && c.case.callId !== c.id;
   if (c.outcome === "call_112") return ["Call 112", "text-alert"];
   if (c.outcome && existing) return ["Added to open case", "text-ok"];
@@ -327,6 +295,7 @@ const TOOL_LABEL: Record<string, string> = {
   verify_identity: "Identify caller",
   get_case: "Read case",
   record_intake: "Record symptoms",
+  book_time: "Book time",
 };
 const VERDICT_COLOR: Record<AccessEntry["verdict"], string> = { allowed: "bg-ok", refused: "bg-alert", ask: "bg-warn" };
 
