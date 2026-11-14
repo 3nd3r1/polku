@@ -1,6 +1,6 @@
-# Verda Discord post
+# Polku on Verda
 
-## The challenge
+## The challenge we entered
 
 Verda Compute Track. Prizes: $10 000 credits + hoodies, $2 500, $2 500.
 
@@ -10,13 +10,7 @@ Verda Compute Track. Prizes: $10 000 credits + hoodies, $2 500, $2 500.
 
 Source: [Junction Platform](https://hackjunction.app/participate/45/tech-challenges/56), pulled 14.11.2026. Full brief in `docs/reference/tech-challenges-brief.md`.
 
-## Before posting
-
-- [ ] Find the channel name, and check for any required tags or format, in the Junction/Verda Discord (or ask a Verda mentor)
-- [ ] Check the deadline (final submission is Sun 10:00)
-- [ ] Optional: run `agent/verda/smoke.mts polku-qwen3` (with `SMOKE_MODEL=qwen3`) to get a measured time to first token. Add it only if you measure it.
-
-## Post (paste from here)
+## Summary
 
 **Polku: a phone line for suspected lung cancer, with its language model on Verda**
 Junction 2026 · AstraZeneca challenge "Equal Care Across Finland"
