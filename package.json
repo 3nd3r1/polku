@@ -13,7 +13,8 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
     "agent:push": "tsx agent/sync.ts && cd agent && elevenlabs tools push && elevenlabs agents push",
-    "start:prod": "drizzle-kit push --force && tsx src/db/seed.ts --if-empty && next start -H 0.0.0.0 -p 3000"
+    "start:prod": "drizzle-kit push --force && tsx src/db/seed.ts --if-empty && next start -H 0.0.0.0 -p 3000",
+    "deploy": "coolify deploy uuid d44cwwc4ssc8kwgg8gogs840"
   },
   "dependencies": {
     "@elevenlabs/react": "1.22.1",

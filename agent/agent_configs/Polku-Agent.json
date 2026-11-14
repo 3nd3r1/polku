@@ -623,110 +623,81 @@
         }
     },
     "tags": [
-        "example"
+        "polku"
     ],
     "workflow": {
-        "edges": {
-            "edge_billing_to_resolve": {
-                "backward_condition": null,
-                "forward_condition": {
-                    "exit_slot": {
-                        "type": "any"
-                    },
-                    "label": null,
-                    "type": "unconditional"
-                },
-                "reroutes": [],
-                "source": "account_billing",
-                "target": "resolve_or_escalate"
-            },
-            "edge_identify_to_billing": {
-                "backward_condition": null,
-                "forward_condition": {
-                    "condition": "The caller has an account access issue, billing question, plan inquiry, or payment problem",
-                    "exit_slot": {
-                        "type": "any"
-                    },
-                    "label": null,
-                    "type": "llm"
-                },
-                "reroutes": [],
-                "source": "identify_issue",
-                "target": "account_billing"
-            },
-            "edge_identify_to_troubleshoot": {
-                "backward_condition": null,
-                "forward_condition": {
-                    "condition": "The caller has a technical issue, API error, integration problem, or performance concern",
-                    "exit_slot": {
-                        "type": "any"
-                    },
-                    "label": null,
-                    "type": "llm"
-                },
-                "reroutes": [],
-                "source": "identify_issue",
-                "target": "troubleshoot"
-            },
-            "edge_resolve_to_end": {
-                "backward_condition": null,
-                "forward_condition": {
-                    "exit_slot": {
-                        "type": "any"
-                    },
-                    "label": null,
-                    "type": "unconditional"
-                },
-                "reroutes": [],
-                "source": "resolve_or_escalate",
-                "target": "end_node"
-            },
-            "edge_start_to_identify": {
-                "backward_condition": null,
-                "forward_condition": {
-                    "exit_slot": {
-                        "type": "any"
-                    },
-                    "label": null,
-                    "type": "unconditional"
-                },
-                "reroutes": [],
-                "source": "start_node",
-                "target": "identify_issue"
-            },
-            "edge_troubleshoot_to_resolve": {
-                "backward_condition": null,
-                "forward_condition": {
-                    "exit_slot": {
-                        "type": "any"
-                    },
-                    "label": null,
-                    "type": "unconditional"
-                },
-                "reroutes": [],
-                "source": "troubleshoot",
-                "target": "resolve_or_escalate"
-            }
-        },
-        "frames": {},
         "nodes": {
-            "account_billing": {
+            "start_node": {
+                "edge_order": [
+                    "start_to_identify"
+                ],
+                "parent_frame_id": null,
+                "parent_subgraph_id": null,
+                "position": {
+                    "x": 0,
+                    "y": 0
+                },
+                "type": "start"
+            },
+            "identify": {
                 "additional_knowledge_base": [],
-                "additional_prompt": "Account or billing question. Verify identity BEFORE sharing any account info: ask for account email plus a secondary signal (last 4 of payment, recent invoice number, or account ID). Once verified, answer accurately. For backend changes (refunds, plan changes), route to resolve_or_escalate. Never share other accounts' info.\n\nIMPORTANT: If the caller signals they want to end the call, briefly acknowledge AND call end_call.",
+                "additional_prompt": "Step 1: ask for the personal identity code and call verify_identity with it. Do nothing else until it succeeds. If the caller describes a red-flag symptom, tell them to call 112 now.",
                 "additional_tool_ids": [],
                 "allow_interruptions_on_entry": false,
                 "conversation_config": {},
                 "edge_order": [
-                    "edge_billing_to_resolve"
+                    "identify_to_case",
+                    "identify_to_end"
                 ],
                 "entry_behavior": "auto",
                 "forced_tool_name": null,
-                "label": "Account & Billing",
+                "label": "1 Identify caller",
                 "parent_frame_id": null,
                 "parent_subgraph_id": null,
                 "position": {
-                    "x": 320,
-                    "y": 440
+                    "x": 0,
+                    "y": 200
+                },
+                "type": "override_agent"
+            },
+            "check_case": {
+                "additional_knowledge_base": [],
+                "additional_prompt": "Step 2: the caller is identified. Greet them by first name and call get_case. If they have an open case, tell them the returned sentence word for word and ask whether anything is new or worse.",
+                "additional_tool_ids": [],
+                "allow_interruptions_on_entry": false,
+                "conversation_config": {},
+                "edge_order": [
+                    "case_to_symptoms",
+                    "case_to_end"
+                ],
+                "entry_behavior": "auto",
+                "forced_tool_name": "get_case",
+                "label": "2 Check case",
+                "parent_frame_id": null,
+                "parent_subgraph_id": null,
+                "position": {
+                    "x": 0,
+                    "y": 420
+                },
+                "type": "override_agent"
+            },
+            "symptoms": {
+                "additional_knowledge_base": [],
+                "additional_prompt": "Step 3: ask about symptoms, how long, any known cause, and smoking. Call record_intake, ask what it says is missing, and say the returned sentence word for word.",
+                "additional_tool_ids": [],
+                "allow_interruptions_on_entry": false,
+                "conversation_config": {},
+                "edge_order": [
+                    "symptoms_to_end"
+                ],
+                "entry_behavior": "auto",
+                "forced_tool_name": null,
+                "label": "3 Record symptoms",
+                "parent_frame_id": null,
+                "parent_subgraph_id": null,
+                "position": {
+                    "x": 0,
+                    "y": 640
                 },
                 "type": "override_agent"
             },
@@ -738,90 +709,113 @@
                 "parent_subgraph_id": null,
                 "position": {
                     "x": 0,
-                    "y": 880
+                    "y": 860
                 },
                 "return_when_nested": true,
                 "type": "end"
             },
-            "identify_issue": {
-                "additional_knowledge_base": [],
-                "additional_prompt": "Open warmly: 'Hey, this is Jamie from support — what can I help with today?' Listen to the issue. Acknowledge any frustration ('that's really frustrating, let's figure it out'). Capture caller name early. Categorize: technical/integration/product (route to troubleshoot) vs account/billing (route to account_billing). Ask one or two clarifying questions if intent is unclear.\n\nIMPORTANT: If the caller asks to be removed, says they have the wrong number, says goodbye, or wants to end the call, briefly acknowledge AND call end_call to actually hang up.",
-                "additional_tool_ids": [],
-                "allow_interruptions_on_entry": false,
-                "conversation_config": {},
-                "edge_order": [
-                    "edge_identify_to_troubleshoot",
-                    "edge_identify_to_billing"
-                ],
-                "entry_behavior": "auto",
-                "forced_tool_name": null,
-                "label": "Identify Issue",
+            "end_early": {
+                "edge_order": [],
+                "exit_slot": null,
+                "outcome": "success",
                 "parent_frame_id": null,
                 "parent_subgraph_id": null,
                 "position": {
-                    "x": 0,
-                    "y": 220
+                    "x": 360,
+                    "y": 640
                 },
-                "type": "override_agent"
-            },
-            "resolve_or_escalate": {
-                "additional_knowledge_base": [],
-                "additional_prompt": "If the issue is resolved on the call: confirm the fix worked, tell them to reach out if it returns, then route to wrap up. If escalating: capture caller name + best contact + one-sentence summary of issue and what was tried + urgency. Set realistic expectation for response time (24h business hours unless documented). Read back the next-step plan.\n\nIMPORTANT: If the caller signals they want to end the call, briefly acknowledge AND call end_call to hang up.",
-                "additional_tool_ids": [
-                    "tool_7801kpeebjrpenjre37p762ezctf",
-                    "tool_9301kkcx86fxer2aa9rat2f6n454"
-                ],
-                "allow_interruptions_on_entry": false,
-                "conversation_config": {},
-                "edge_order": [
-                    "edge_resolve_to_end"
-                ],
-                "entry_behavior": "auto",
-                "forced_tool_name": null,
-                "label": "Resolve or Escalate",
-                "parent_frame_id": null,
-                "parent_subgraph_id": null,
-                "position": {
-                    "x": 0,
-                    "y": 660
-                },
-                "type": "override_agent"
-            },
-            "start_node": {
-                "edge_order": [
-                    "edge_start_to_identify"
-                ],
-                "parent_frame_id": null,
-                "parent_subgraph_id": null,
-                "position": {
-                    "x": 0,
-                    "y": 0
-                },
-                "type": "start"
-            },
-            "troubleshoot": {
-                "additional_knowledge_base": [],
-                "additional_prompt": "Methodical troubleshooting. Propose ONE concrete first step (not a list, not a pile of questions). Wait for the caller to confirm what they see before moving on. Explain why each step matters in plain language. If 3-4 steps don't help, route to resolve_or_escalate. Capture what was tried for the ticket.\n\nIMPORTANT: If the caller signals they want to end the call, briefly acknowledge AND call end_call.",
-                "additional_tool_ids": [],
-                "allow_interruptions_on_entry": false,
-                "conversation_config": {},
-                "edge_order": [
-                    "edge_troubleshoot_to_resolve"
-                ],
-                "entry_behavior": "auto",
-                "forced_tool_name": null,
-                "label": "Troubleshoot",
-                "parent_frame_id": null,
-                "parent_subgraph_id": null,
-                "position": {
-                    "x": -320,
-                    "y": 440
-                },
-                "type": "override_agent"
+                "return_when_nested": true,
+                "type": "end"
             }
         },
-        "prevent_subagent_loops": false,
+        "edges": {
+            "start_to_identify": {
+                "backward_condition": null,
+                "forward_condition": {
+                    "exit_slot": {
+                        "type": "any"
+                    },
+                    "label": null,
+                    "type": "unconditional"
+                },
+                "reroutes": [],
+                "source": "start_node",
+                "target": "identify"
+            },
+            "identify_to_case": {
+                "backward_condition": null,
+                "forward_condition": {
+                    "condition": "verify_identity confirmed the caller's identity",
+                    "exit_slot": {
+                        "type": "any"
+                    },
+                    "label": null,
+                    "type": "llm"
+                },
+                "reroutes": [],
+                "source": "identify",
+                "target": "check_case"
+            },
+            "identify_to_end": {
+                "backward_condition": null,
+                "forward_condition": {
+                    "condition": "The caller was told to call 112, or identification is locked after three failed attempts",
+                    "exit_slot": {
+                        "type": "any"
+                    },
+                    "label": null,
+                    "type": "llm"
+                },
+                "reroutes": [],
+                "source": "identify",
+                "target": "end_early"
+            },
+            "case_to_symptoms": {
+                "backward_condition": null,
+                "forward_condition": {
+                    "condition": "The caller has no open case, or reports something new or worse",
+                    "exit_slot": {
+                        "type": "any"
+                    },
+                    "label": null,
+                    "type": "llm"
+                },
+                "reroutes": [],
+                "source": "check_case",
+                "target": "symptoms"
+            },
+            "case_to_end": {
+                "backward_condition": null,
+                "forward_condition": {
+                    "condition": "The caller heard their case status and has nothing new to report",
+                    "exit_slot": {
+                        "type": "any"
+                    },
+                    "label": null,
+                    "type": "llm"
+                },
+                "reroutes": [],
+                "source": "check_case",
+                "target": "end_early"
+            },
+            "symptoms_to_end": {
+                "backward_condition": null,
+                "forward_condition": {
+                    "condition": "The sentence returned by record_intake has been said to the caller",
+                    "exit_slot": {
+                        "type": "any"
+                    },
+                    "label": null,
+                    "type": "llm"
+                },
+                "reroutes": [],
+                "source": "symptoms",
+                "target": "end_node"
+            }
+        },
+        "frames": {},
         "subgraphs": {},
+        "prevent_subagent_loops": false,
         "version": 1
     }
 }

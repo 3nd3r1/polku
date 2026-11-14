@@ -53,9 +53,92 @@ a.prompt.built_in_tools.end_call = {
   type: "system",
 };
 config.conversation_config.tts.suggested_audio_tags = [];
+config.tags = ["polku"];
+config.workflow = workflow();
 config.conversation_config.conversation.max_duration_seconds = 300;
 config.platform_settings.call_limits.daily_limit = 300;
 config.platform_settings.auth.enable_auth = false; // the Screening page connects with the agent id only
 writeJson(agent.config, config);
 
 console.log(`Synced ${AGENT_TOOLS.length} tools and ${agent.config}`);
+
+/**
+ * The call as a graph, for the ElevenLabs workflow view. Each step adds a
+ * focused instruction; all tools stay available everywhere so a missed
+ * transition never strands the agent. What each tool returns is decided by
+ * the server (src/server/identity.ts), not by this graph.
+ */
+function workflow() {
+  const agentNode = (label: string, prompt: string, y: number, edges: string[], forcedTool: string | null = null) => ({
+    additional_knowledge_base: [],
+    additional_prompt: prompt,
+    additional_tool_ids: [],
+    allow_interruptions_on_entry: false,
+    conversation_config: {},
+    edge_order: edges,
+    entry_behavior: "auto",
+    forced_tool_name: forcedTool,
+    label,
+    parent_frame_id: null,
+    parent_subgraph_id: null,
+    position: { x: 0, y },
+    type: "override_agent",
+  });
+  const edge = (source: string, target: string, condition: string | null) => ({
+    backward_condition: null,
+    forward_condition: condition
+      ? { condition, exit_slot: { type: "any" }, label: null, type: "llm" }
+      : { exit_slot: { type: "any" }, label: null, type: "unconditional" },
+    reroutes: [],
+    source,
+    target,
+  });
+  const end = (x: number, y: number) => ({
+    edge_order: [],
+    exit_slot: null,
+    outcome: "success",
+    parent_frame_id: null,
+    parent_subgraph_id: null,
+    position: { x, y },
+    return_when_nested: true,
+    type: "end",
+  });
+  return {
+    nodes: {
+      start_node: { edge_order: ["start_to_identify"], parent_frame_id: null, parent_subgraph_id: null, position: { x: 0, y: 0 }, type: "start" },
+      identify: agentNode(
+        "1 Identify caller",
+        "Step 1: ask for the personal identity code and call verify_identity with it. Do nothing else until it succeeds. If the caller describes a red-flag symptom, tell them to call 112 now.",
+        200,
+        ["identify_to_case", "identify_to_end"],
+      ),
+      check_case: agentNode(
+        "2 Check case",
+        "Step 2: the caller is identified. Greet them by first name and call get_case. If they have an open case, tell them the returned sentence word for word and ask whether anything is new or worse.",
+        420,
+        ["case_to_symptoms", "case_to_end"],
+        "get_case",
+      ),
+      symptoms: agentNode(
+        "3 Record symptoms",
+        "Step 3: ask about symptoms, how long, any known cause, and smoking. Call record_intake, ask what it says is missing, and say the returned sentence word for word.",
+        640,
+        ["symptoms_to_end"],
+      ),
+      end_node: end(0, 860),
+      end_early: end(360, 640),
+    },
+    edges: {
+      start_to_identify: edge("start_node", "identify", null),
+      identify_to_case: edge("identify", "check_case", "verify_identity confirmed the caller's identity"),
+      identify_to_end: edge("identify", "end_early", "The caller was told to call 112, or identification is locked after three failed attempts"),
+      case_to_symptoms: edge("check_case", "symptoms", "The caller has no open case, or reports something new or worse"),
+      case_to_end: edge("check_case", "end_early", "The caller heard their case status and has nothing new to report"),
+      symptoms_to_end: edge("symptoms", "end_node", "The sentence returned by record_intake has been said to the caller"),
+    },
+    frames: {},
+    subgraphs: config.workflow?.subgraphs ?? {},
+    prevent_subagent_loops: config.workflow?.prevent_subagent_loops ?? true,
+    version: config.workflow?.version,
+  };
+}
