@@ -32,6 +32,22 @@ export async function appendTranscript(callId: string, role: TranscriptLine["rol
   publishChange();
 }
 
+/** The whole transcript at once: a phone call's, rebuilt from ElevenLabs' conversation history. */
+export async function setTranscript(
+  callId: string,
+  lines: { role: TranscriptLine["role"]; text: string }[],
+  final = false,
+) {
+  const [row] = await db.select({ transcript: calls.transcript }).from(calls).where(eq(calls.id, callId));
+  if (!row || lines.length === 0) return;
+  // Live histories never shrink it (they can arrive out of order); the final one replaces it.
+  if (!final && lines.length <= row.transcript.length) return;
+  const at = new Date().toISOString();
+  const transcript = lines.map((l, i) => ({ ...l, text: l.text.slice(0, 2000), at: row.transcript[i]?.at ?? at }));
+  await db.update(calls).set({ transcript }).where(eq(calls.id, callId));
+  publishChange();
+}
+
 export type AccessEntry = { at: string; tool: string; verdict: "allowed" | "refused" | "ask"; detail: string };
 
 export type CallView = {

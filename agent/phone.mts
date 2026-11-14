@@ -62,8 +62,10 @@ for (const tool of AGENT_TOOLS) {
         properties: {
           ...params.properties,
           conversation_id: { type: "string", dynamic_variable: "system__conversation_id", description: "" },
+          // The transcript so far: the server shows it live, since the conversation API only has it after the call.
+          conversation_history: { type: "string", dynamic_variable: "system__conversation_history", description: "" },
         },
-        required: [...(params.required ?? []), "conversation_id"],
+        required: [...(params.required ?? []), "conversation_id", "conversation_history"],
       },
     },
   };
@@ -74,7 +76,13 @@ for (const tool of AGENT_TOOLS) {
 }
 
 // Agent: the web agent's prompt, voice and workflow, with the webhook tools.
-type Agent = { conversation_config: { agent: { prompt: { tool_ids?: string[]; tools?: unknown } } }; platform_settings: Record<string, unknown>; workflow?: unknown };
+type Agent = {
+  conversation_config: {
+    agent: { prompt: { tool_ids?: string[]; tools?: unknown } };
+  };
+  platform_settings: Record<string, unknown>;
+  workflow?: unknown;
+};
 const web = await api<Agent>("GET", `/agents/${webAgentId}`);
 web.conversation_config.agent.prompt.tool_ids = AGENT_TOOLS.map((t) => ids.tools[t.name]);
 delete web.conversation_config.agent.prompt.tools; // the GET returns both; create accepts one

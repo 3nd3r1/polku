@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { calls } from "../db/schema";
 import { CALLBACK_FIRST_MESSAGE } from "./agent-tools";
-import { appendTranscript, endCall } from "./calls";
+import { endCall, setTranscript } from "./calls";
 import { publishChange } from "./bus";
 
 /**
@@ -93,23 +93,23 @@ async function ring(callId: string, firstMessage?: string) {
 
 const watching = new Set<string>();
 
-/** Copies the conversation's transcript into the call every 2 s until ElevenLabs says it ended. */
+/**
+ * Checks the conversation every 2 s until ElevenLabs says it ended, then
+ * writes the final transcript and ends the call. During the call the API has
+ * no transcript yet; the live one comes with each webhook (syncHistory).
+ */
 function watch(conversationId: string, callId: string) {
   if (watching.has(conversationId)) return;
   watching.add(conversationId);
-  let copied = 0;
   const started = Date.now();
   const tick = async () => {
     try {
       const res = await fetch(`${API}/conversations/${conversationId}`, { headers: { "xi-api-key": apiKey() ?? "" } });
       if (res.ok) {
         const c = (await res.json()) as { status: string; transcript?: { role: string; message: string | null }[] };
-        const lines = (c.transcript ?? []).filter((l) => l.message?.trim());
-        for (const l of lines.slice(copied)) {
-          await appendTranscript(callId, l.role === "user" ? "caller" : "agent", l.message!.slice(0, 2000));
-        }
-        copied = lines.length;
-        if (c.status === "done" || c.status === "failed") {
+        const done = c.status === "done" || c.status === "failed";
+        await setTranscript(callId, toLines(c.transcript ?? []), done);
+        if (done) {
           await endCall(callId).catch(() => {});
           watching.delete(conversationId);
           return;
@@ -125,4 +125,22 @@ function watch(conversationId: string, callId: string) {
     setTimeout(tick, 2000);
   };
   setTimeout(tick, 1000);
+}
+
+/** ElevenLabs transcript entries (from the API or system__conversation_history) as call transcript lines. */
+export function toLines(entries: { role: string; message?: string | null }[]) {
+  return entries
+    .filter((e) => (e.role === "user" || e.role === "agent") && e.message?.trim())
+    .map((e) => ({ role: e.role === "user" ? ("caller" as const) : ("agent" as const), text: e.message!.trim() }));
+}
+
+/** The live transcript a webhook carries: system__conversation_history, a JSON string. */
+export async function syncHistory(callId: string, history: unknown) {
+  if (typeof history !== "string" || !history) return;
+  try {
+    const parsed = JSON.parse(history) as { entries?: { role: string; message?: string | null }[] };
+    await setTranscript(callId, toLines(parsed.entries ?? []));
+  } catch {
+    // A history we cannot read only costs the live view; the full transcript comes when the call ends.
+  }
 }

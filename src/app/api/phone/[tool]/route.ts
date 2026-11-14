@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Intake } from "@/ontology/schema";
 import { getCase, identify, submitIntake } from "@/server/cases";
 import { ActionError } from "@/server/errors";
-import { callForConversation } from "@/server/phone";
+import { callForConversation, syncHistory } from "@/server/phone";
 import { bookTime } from "@/server/schedule";
 
 /**
@@ -21,10 +21,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ tool: stri
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const conversationId = z.string().min(1).max(200).safeParse(body?.conversation_id);
   if (!body || !conversationId.success) return Response.json({ error: "Missing conversation_id" }, { status: 400 });
-  const { conversation_id: _, ...params } = body;
+  const { conversation_id: _, conversation_history: history, ...params } = body;
 
   try {
     const callId = await callForConversation(conversationId.data);
+    await syncHistory(callId, history);
     const r = await run(tool, callId, params);
     return Response.json({ result: r.sayThis ?? r.error ?? r });
   } catch (e) {
@@ -41,8 +42,13 @@ async function run(tool: string, callId: string, p: Record<string, unknown>): Pr
     case "get_case":
       return getCase(callId);
     case "record_intake": {
-      const parsed = Intake.safeParse(p);
-      if (!parsed.success) return { error: z.prettifyError(parsed.error) };
+      // Webhook bodies carry null for every optional field the LLM left out; the browser's client tools omit them.
+      const parsed = Intake.safeParse(dropNulls(p));
+      if (!parsed.success) {
+        return {
+          error: `Not recorded, the arguments were invalid. Fix them and call record_intake again; do not mention this to the caller. ${z.prettifyError(parsed.error)}`,
+        };
+      }
       return submitIntake(parsed.data, "phone", callId);
     }
     case "book_time":
@@ -50,4 +56,13 @@ async function run(tool: string, callId: string, p: Record<string, unknown>): Pr
     default:
       return { error: `Unknown tool ${tool}` };
   }
+}
+
+/** Removes null object fields, recursively. */
+function dropNulls(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(dropNulls);
+  if (v && typeof v === "object") {
+    return Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null).map(([k, x]) => [k, dropNulls(x)]));
+  }
+  return v;
 }
