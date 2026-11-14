@@ -2,6 +2,7 @@
 
 import { ConversationProvider, useConversation, useConversationClientTool } from "@elevenlabs/react";
 import { createContext, useContext, useRef, useState } from "react";
+import { DEMO_SITE } from "@/demo/site";
 
 export const AGENT_ID = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
 
@@ -64,7 +65,8 @@ function useAgentCall() {
   return {
     /** The call this browser is on, if any. */
     callId: activeId,
-    available: Boolean(AGENT_ID),
+    /** A voice agent is configured. Never on the public demo site, which is scripted only. */
+    available: Boolean(AGENT_ID) && !DEMO_SITE,
     live: conversation.status === "connected" || conversation.status === "connecting",
     start(id: string, firstMessage?: string) {
       callId.current = id;

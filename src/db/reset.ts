@@ -25,7 +25,7 @@ async function resetLocal() {
 }
 
 async function resetProd() {
-  const url = process.env.POLKU_URL ?? "https://polku.eros.ender.fi";
+  const url = process.env.POLKU_URL ?? "https://prod-polku.eros.ender.fi";
   const token = process.env.ADMIN_TOKEN;
   if (!token) throw new Error("ADMIN_TOKEN missing from .env.local");
   const res = await fetch(`${url}/api/admin/reset`, { method: "POST", headers: { authorization: `Bearer ${token}` } });

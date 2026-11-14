@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { SMOKING_LABEL, STEP_LABEL } from "@/ontology/labels";
+import { simulateCallback } from "@/demo/scripts";
 import { lung } from "@/pathways/lung";
 import { CALLBACK_FIRST_MESSAGE } from "@/server/agent-tools";
 import type { CallView } from "@/server/calls";
@@ -148,7 +149,12 @@ function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call:
     setError(null);
     const r = await post(`/api/cases/${c.id}/propose`, { times: picked });
     if (!r.callId) return setError(r.error ?? "Could not start the callback");
-    if (phone.available && !phone.live) phone.start(r.callId, CALLBACK_FIRST_MESSAGE);
+    if (phone.available) {
+      if (!phone.live) phone.start(r.callId, CALLBACK_FIRST_MESSAGE);
+    } else {
+      // No voice agent (the public demo site): a scripted patient answers, through the same API.
+      simulateCallback(r.callId, c);
+    }
   }
 
   async function bookMyself() {
@@ -269,7 +275,7 @@ function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call:
         </section>
       )}
 
-      {call && !booked && <CallStatus call={call} name={name} live={phone.live && phone.callId === call.id} onHangUp={phone.end} />}
+      {call && !booked && <CallStatus call={call} name={name} scripted={!phone.available} live={phone.live && phone.callId === call.id} onHangUp={phone.end} />}
 
       {sources.length > 0 && (
         <p className="border-t border-line pt-4 text-xs text-dim">
@@ -322,7 +328,7 @@ function FreeTimes({ cal, picked, onPick }: { cal: CalendarView; picked: string[
 }
 
 /** Where the callback is right now, in one line. */
-function CallStatus({ call, name, live, onHangUp }: { call: CallView; name: string; live: boolean; onHangUp: () => void }) {
+function CallStatus({ call, name, scripted, live, onHangUp }: { call: CallView; name: string; scripted: boolean; live: boolean; onHangUp: () => void }) {
   const allowed = (tool: string) => call.access.some((e) => e.tool === tool && e.verdict === "allowed");
   const refused = call.access.filter((e) => e.tool === "verify_identity").at(-1)?.verdict === "refused";
   const ended = call.status === "ended";
@@ -343,6 +349,7 @@ function CallStatus({ call, name, live, onHangUp }: { call: CallView; name: stri
         <span className={`h-2.5 w-2.5 shrink-0 ${ended ? "bg-alert" : "animate-pulse bg-warn"}`} aria-hidden />
         {text}
       </p>
+      {scripted && <span className="label shrink-0">Scripted patient · synthetic</span>}
       {live && (
         <button onClick={onHangUp} className="text-sm text-alert">
           Hang up

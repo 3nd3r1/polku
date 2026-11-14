@@ -2,7 +2,7 @@
 
 A phone line for suspected lung cancer. The caller describes their symptoms, a rules engine checks them against published Nordic referral criteria, and a nurse calls back by a deadline. Every pathway step after that runs on a clock, and the clocks roll up per wellbeing county.
 
-Built at Junction 2026 for the AstraZeneca challenge "Equal Care Across Finland". Live at https://polku.eros.ender.fi.
+Built at Junction 2026 for the AstraZeneca challenge "Equal Care Across Finland". Try the public demo at https://polku.ender.fi/demo.
 
 ## Why
 
@@ -58,6 +58,22 @@ npm run deploy            # manual redeploy if the webhook fails
 npm run demo:reset        # wipe and reseed local and production (or: demo:reset local, demo:reset prod)
 npm run agent:push        # push prompt and tools to ElevenLabs
 ```
+
+### Two sites
+
+Both are Coolify apps in the `polku` project, built from `main` with the same Dockerfile.
+
+| | Production | Public demo |
+|---|---|---|
+| Coolify environment | `production` | `demo` |
+| URL | https://prod-polku.eros.ender.fi | https://polku.ender.fi |
+| Database (Aiven) | `defaultdb` | `polku_demo` |
+| For | us: voice calls, the pitch, the video | anyone: the link we hand out, start at `/demo` |
+| `NEXT_PUBLIC_DEMO_SITE` (build time) | unset | `1` |
+| `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` | set | unset |
+| `SITE_PASSWORD` | set: the browser asks for it once, any user name | unset |
+
+The demo site has no voice calls: scripted callers on `/demo` stand in for the phone, a scripted patient answers the callback, and the reset needs no token. It does not deploy on push: run `npm run deploy:demo`.
 
 ## Code
 

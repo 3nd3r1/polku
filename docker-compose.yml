@@ -24,6 +24,8 @@ services:
       args:
         # Public agent id, read from .env.local by `npm run up`. Empty hides the call button.
         NEXT_PUBLIC_ELEVENLABS_AGENT_ID: ${NEXT_PUBLIC_ELEVENLABS_AGENT_ID:-}
+        # NEXT_PUBLIC_DEMO_SITE=1 npm run up: try the public demo site locally.
+        NEXT_PUBLIC_DEMO_SITE: ${NEXT_PUBLIC_DEMO_SITE:-}
     environment:
       DATABASE_URL: postgres://polku:polku@db:5432/polku
     ports:

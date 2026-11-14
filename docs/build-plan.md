@@ -26,7 +26,7 @@ The demo moment is the phone ringing back. A judge makes the call, accepts the t
 | Callback      | Built. Accept starts the browser callback; `book_time` books the pick. Browser call only, no real phone yet.                                                            |
 | Handoff strip | Built at `/handoffs`. One line per patient, holder and deadline per handoff, parts of the record each step opened, full access log per patient (`record_access`).       |
 
-Already done underneath: lung pathway typed and sourced (`src/pathways/lung.ts`), rules engine with tests, identification gate (identity code and simulated Mobile ID, three failures lock the call), cases, clocks and audit in Postgres with live updates. Deployed at https://polku.eros.ender.fi, deploys on push.
+Already done underneath: lung pathway typed and sourced (`src/pathways/lung.ts`), rules engine with tests, identification gate (identity code and simulated Mobile ID, three failures lock the call), cases, clocks and audit in Postgres with live updates. Production at https://prod-polku.eros.ender.fi (password), deploys on push. Public demo at https://polku.ender.fi.
 
 ## Next
 
@@ -46,6 +46,8 @@ Anything that fakes part of the world for the demo lives on one page, `/demo`, n
 - Answer a waiting callback with a scripted patient, for when there's no voice.
 - Demo reset (`/api/admin/reset`, needs the admin token).
 - Synthetic register and resource calendars (`src/db/demo.ts`).
+
+Two deployments from the same code. Production is ours: voice calls, the pitch, the video. Production is locked with a shared password (`SITE_PASSWORD`). The public demo site (https://polku.ender.fi, `NEXT_PUBLIC_DEMO_SITE=1`, own database) is the link we hand out: scripted calls only, no voice, a scripted patient answers the callback, and anyone can press Start over. Visitors land on `/demo`.
 
 ## Cut
 

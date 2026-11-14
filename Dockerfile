@@ -13,6 +13,9 @@ COPY . .
 # Inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_ELEVENLABS_AGENT_ID
 ENV NEXT_PUBLIC_ELEVENLABS_AGENT_ID=$NEXT_PUBLIC_ELEVENLABS_AGENT_ID
+# 1 on the public demo deployment: scripted calls only, no voice, open reset.
+ARG NEXT_PUBLIC_DEMO_SITE
+ENV NEXT_PUBLIC_DEMO_SITE=$NEXT_PUBLIC_DEMO_SITE
 RUN npm run build
 
 ENV NODE_ENV=production
