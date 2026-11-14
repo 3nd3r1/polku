@@ -67,9 +67,6 @@ def riser(length, grid, shepard=False):
             amp = np.exp(-0.5 * ((pos - 3) / 1.1) ** 2)
             tone += np.sin(2 * np.pi * np.cumsum(f) / SR) * amp
         x += tone * (0.04 + 0.22 * p**1.6)
-    # Drive: saturate so the build is loud in RMS, not just on its peaks, and louder still at the top.
-    x = x / np.abs(x).max()
-    x = np.tanh(x * (2 + 6 * p)) / np.tanh(8)
     x[-int(0.004 * SR) :] *= np.linspace(1, 0, int(0.004 * SR))  # hard stop, no click
     return x / np.abs(x).max() * 0.9
 

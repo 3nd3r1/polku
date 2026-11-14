@@ -51,7 +51,7 @@ export function cues(people: boolean): Cue[] {
     voice("H-map", 4.8, "h-vo-2"),
     voice("P-sovereign", P_TIMES.vo, "p-vo"),
     // O: thumps accelerate with the build: bars, then beats, then 8ths. The riser is in MusicBed.
-    ...[0.15, 2.15, 4.15, 4.65, 5.15, 5.65, 6.15, 6.4, 6.65, 6.9, 7.15].map((h): Cue => ({ scene: "O-ontology", at: h, file: "v2/sfx/end-thump.wav", volume: 0.5 })),
+    ...[0.15, 2.15, 4.15, 4.65, 5.15, 5.65, 6.15, 6.4, 6.65, 6.9, 7.15].map((h): Cue => ({ scene: "O-ontology", at: h, file: "v2/sfx/end-thump.wav", volume: 0.3 })),
     voice("O-ontology", O_TIMES.vo, "o-vo"),
     voice("K-end", END_TIMES.vo, "k-vo-close"),
   ];
@@ -133,7 +133,7 @@ export const MusicBed: React.FC<{ people: boolean; sceneStart: (id: string) => n
       })}
       {/* The ontology build: riser on the score's kicks (x.15), climbing to the breath. */}
       <Sequence from={sceneStart("O-ontology") + s(0.15)} name="onto-build">
-        <Html5Audio src={staticFile("v2/sfx/onto-build.wav")} volume={(lf) => interpolate(lf, [0, s(7.5)], [0.3, 0.75], clampX)} />
+        <Html5Audio src={staticFile("v2/sfx/onto-build.wav")} volume={(lf) => interpolate(lf, [0, s(7.5)], [0.1, 0.35], clampX)} />
       </Sequence>
       {/* The drop: impact and final chord (ElevenLabs, end-drop.mp3), its hit on the drop beat.
           Ducks less than the bed: the chord should still swell under the closing line. */}
