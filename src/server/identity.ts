@@ -21,7 +21,7 @@ type Call = typeof calls.$inferSelect;
 
 export const MAX_FAILED_VERIFICATIONS = 3;
 /** Simulated Mobile ID round trip. Tests set it to 0. */
-const mobileIdDelayMs = () => Number(process.env.MOBILE_ID_DELAY_MS ?? 2500);
+const mobileIdDelayMs = () => Number(process.env.MOBILE_ID_DELAY_MS ?? 1000);
 
 /** One row per tool call, in plain words: it is shown on the Screening screen as is. */
 export async function logAccess(callId: string, tool: Tool, verdict: Verdict, detail: string) {
@@ -63,7 +63,11 @@ export async function requireIdentified(callId: string, tool: Tool): Promise<{ c
 export async function verifyIdentity(callId: string, spokenHetu: string) {
   const call = await getCall(callId);
   const tool = "verify_identity";
-  if (call.personId) {
+  if (call.personId && call.person) {
+    // The phone drops a tool's answer when the caller talks over it, and the agent asks
+    // again. The same code gets the same answer; any other code gets nothing.
+    const again = parseHetu(spokenHetu);
+    if (again.ok && again.hetu.code === call.person.hetu) return confirmed(call.person);
     throw await refuse(callId, tool, "Already identified", "The caller is already identified. Continue.", 409);
   }
   if (call.status === "verifying") {
@@ -125,9 +129,13 @@ export async function verifyIdentity(callId: string, spokenHetu: string) {
   await logAccess(callId, tool, "allowed", `${maskHetu(person.hetu)} confirmed by Mobile ID (simulated)`);
   publishChange();
 
+  return confirmed(person);
+}
+
+/** Only what the conversation needs. Never the identity code, never the full name. */
+function confirmed(person: Person) {
   const firstName = person.name.split(" ")[0];
   return {
-    // Only what the conversation needs. Never the identity code, never the full name.
     sayThis: `Identity confirmed with Mobile ID. The caller is ${firstName}, ${ageOf(person)} years old, from ${person.county}. Greet them by first name and do not ask their age.`,
   };
 }

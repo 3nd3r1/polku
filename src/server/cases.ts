@@ -110,7 +110,7 @@ export async function identify(callId: string, spokenHetu: string) {
 async function offerTimes(callId: string, caseId: string, clock: Clock, slots: { at: string; unit: string }[]) {
   const step = STEP_SPOKEN[clock.stepId] ?? "your next appointment";
   const options = slots.map((s, i) => `option ${i + 1}, ${spokenDayTime(new Date(s.at))}`).join("; ");
-  const summary = `The nurse has reviewed your case, and we have times for ${step} at ${slots[0].unit}: ${options}. Which one suits you?`;
+  const summary = `The nurse has reviewed your case, and we have times for ${step} at ${slots[0].unit}: ${options}. ${slots.length === 1 ? "Does that time suit you?" : "Which one suits you?"}`;
   await db.update(calls).set({ caseId }).where(eq(calls.id, callId));
   await logRecord(caseId, "call", "read", ["identity", "booking"], "Polku agent");
   await db.insert(audit).values({ caseId, action: "CallerHeardTimes", actor: "system", data: { callId } });

@@ -52,6 +52,9 @@ for (const tool of AGENT_TOOLS) {
     name: tool.name,
     description: tool.description,
     response_timeout_secs: 30,
+    // The caller talking over a tool call made ElevenLabs drop the answer, and the agent then asked
+    // again (a second booking attempt, a lost confirmation). Hold the line until the tool answers.
+    disable_interruptions: true,
     api_schema: {
       url: `${BASE}/api/phone/${tool.name}`,
       method: "POST",

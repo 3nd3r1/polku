@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
-import { audit, calls, cases, clocks } from "../db/schema";
+import { accessLog, audit, calls, cases, clocks } from "../db/schema";
 import { shortDayTime, spokenDayTime, STAFF_ONLY_STEPS, STEP_LABEL, STEP_SPOKEN } from "../ontology/labels";
 import { lung } from "../pathways/lung";
 import { ontologyPath, resourceCalendar, resourcesFor } from "../sim/capacity";
@@ -230,6 +230,14 @@ export async function bookTime(callId: string, option: number) {
         .from(clocks)
         .where(and(eq(clocks.caseId, c.id), isNull(clocks.stoppedAt)))
     : [];
+  // Already booked on this call (the caller talked over the answer and the agent asked again): same answer.
+  if (c && c.personId === person.id && k?.scheduledAt && k.unit && !k.offeredSlots?.length) {
+    const [earlier] = await db
+      .select({ id: accessLog.id })
+      .from(accessLog)
+      .where(and(eq(accessLog.callId, callId), eq(accessLog.tool, tool), eq(accessLog.verdict, "allowed")));
+    if (earlier) return booked(k.stepId, k.scheduledAt, k.unit);
+  }
   if (!c || c.personId !== person.id || !k?.offeredSlots?.length) {
     throw await refuse(callId, tool, "No times proposed to this caller", "There are no times to book for this caller. Call get_case to check their case.", 409);
   }
@@ -254,6 +262,10 @@ export async function bookTime(callId: string, option: number) {
   await logRecord(c.id, "call", "write", ["booking"], "Polku agent");
   await logAccess(callId, tool, "allowed", `Booked ${STEP_LABEL[k.stepId]} ${shortDayTime(at)}`);
   publishChange();
-  const summary = `You are booked for ${STEP_SPOKEN[k.stepId] ?? "your appointment"} on ${spokenDayTime(at)} at ${slot.unit}.`;
+  return booked(k.stepId, at, slot.unit);
+}
+
+function booked(stepId: string, at: Date, unit: string) {
+  const summary = `You are booked for ${STEP_SPOKEN[stepId] ?? "your appointment"} on ${spokenDayTime(at)} at ${unit}.`;
   return { summary, sayThis: `Tell them: "${summary}" Then say goodbye and end the call.` };
 }
