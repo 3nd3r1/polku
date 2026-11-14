@@ -23,7 +23,7 @@ Status checked against the code Sat 14.11 09:00.
 | **Scripted callers** in Simulate: Matti, Aino, red flag, Liisa (open case), Impostor | Done |
 | **Strong identification gate**: identity code + simulated Mobile ID, synthetic register in Postgres, access log on screen, tests | Done |
 | **Cockpit v1**: county tile grid, "today: not measured" (real) vs "with Polku" (synthetic, labelled), one headline sentence, one recommendation card, live bump from the call | Todo |
-| **Deploy** before the video is recorded | Done: https://polku.eros.ender.fi (Coolify, Aiven Postgres). Deploy-on-push webhook and CI still todo. |
+| **Deploy** before the video is recorded | Done: https://polku.eros.ender.fi (Coolify, Aiven Postgres). Deploys on push (GitHub webhook). CI still todo. |
 | 2-minute video | Todo |
 
 | Should (prizes, credibility) | Could | Won't |

@@ -51,7 +51,8 @@ Live at **https://polku.eros.ender.fi** (Coolify, Dockerfile build, Aiven Postgr
 
 ```sh
 nix-shell
-git push && npm run deploy   # Coolify CLI; pushes don't deploy on their own
+git push                     # deploys: GitHub webhook → Coolify
+npm run deploy               # manual redeploy, only if the webhook fails
 npm run demo:reset           # wipe calls and cases on production, reseed (needs ADMIN_TOKEN in .env.local)
 npm run agent:push           # push prompt and tools to the ElevenLabs agent
 ```
