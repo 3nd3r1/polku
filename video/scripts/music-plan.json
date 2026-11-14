@@ -1,0 +1,172 @@
+{
+  "positive_global_styles": [
+    "instrumental cinematic minimal electronic score",
+    "felt piano and warm analog synth pulses",
+    "Nordic, restrained, documentary, hopeful",
+    "steady 120 BPM, clean low end, leaves space for dialogue"
+  ],
+  "negative_global_styles": [
+    "vocals",
+    "choir",
+    "EDM drop",
+    "dubstep",
+    "aggressive drums",
+    "corporate ukulele",
+    "orchestral bombast"
+  ],
+  "sections": [
+    {
+      "section_name": "Kitchen and the number (0:00-0:22)",
+      "positive_local_styles": [
+        "solo felt piano",
+        "sparse single notes",
+        "melancholic",
+        "lots of air",
+        "quiet room"
+      ],
+      "negative_local_styles": [
+        "drums",
+        "bass",
+        "pulse"
+      ],
+      "duration_ms": 22000,
+      "lines": []
+    },
+    {
+      "section_name": "He dials (0:22-0:30)",
+      "positive_local_styles": [
+        "a soft synth pulse enters on eighth notes",
+        "piano continues",
+        "gentle anticipation"
+      ],
+      "negative_local_styles": [
+        "drums",
+        "loud"
+      ],
+      "duration_ms": 8000,
+      "lines": []
+    },
+    {
+      "section_name": "The call (0:30-1:05)",
+      "positive_local_styles": [
+        "steady understated pulse",
+        "low warm pad",
+        "very slow build",
+        "minimal, sits under speech"
+      ],
+      "negative_local_styles": [
+        "melody in the mid range",
+        "drums",
+        "busy"
+      ],
+      "duration_ms": 35000,
+      "lines": []
+    },
+    {
+      "section_name": "The promise (1:05-1:12)",
+      "positive_local_styles": [
+        "warm major chord swell",
+        "relief",
+        "then thins out to almost nothing"
+      ],
+      "negative_local_styles": [
+        "drums"
+      ],
+      "duration_ms": 7000,
+      "lines": []
+    },
+    {
+      "section_name": "The nurse and the pathway (1:12-1:25)",
+      "positive_local_styles": [
+        "forward motion",
+        "light ticking percussion",
+        "pulse returns with a bass line",
+        "confident"
+      ],
+      "negative_local_styles": [
+        "heavy drums"
+      ],
+      "duration_ms": 13000,
+      "lines": []
+    },
+    {
+      "section_name": "Emergency rule (1:25-1:33)",
+      "positive_local_styles": [
+        "music drops out abruptly",
+        "single low sustained drone",
+        "tense",
+        "near silence"
+      ],
+      "negative_local_styles": [
+        "melody",
+        "drums",
+        "pulse"
+      ],
+      "duration_ms": 8000,
+      "lines": []
+    },
+    {
+      "section_name": "The map fills in (1:33-1:47)",
+      "positive_local_styles": [
+        "pulse and piano return",
+        "uplifting build",
+        "layers add every bar",
+        "soft kick enters on every beat",
+        "rising energy"
+      ],
+      "negative_local_styles": [
+        "aggressive"
+      ],
+      "duration_ms": 14000,
+      "lines": []
+    },
+    {
+      "section_name": "Build (1:47-1:51)",
+      "positive_local_styles": [
+        "snare roll accelerating",
+        "rising white-noise riser",
+        "big tension build",
+        "kick on every beat",
+        "filter opening up",
+        "cuts to silence in the last half second"
+      ],
+      "negative_local_styles": [
+        "melody resolution"
+      ],
+      "duration_ms": 4000,
+      "lines": []
+    },
+    {
+      "section_name": "Drop (1:51-1:55)",
+      "positive_local_styles": [
+        "huge cinematic impact on the first beat",
+        "deep sub boom",
+        "full warm synth chords",
+        "wide and powerful",
+        "triumphant, hopeful",
+        "driving drums"
+      ],
+      "negative_local_styles": [
+        "thin",
+        "quiet"
+      ],
+      "duration_ms": 4000,
+      "lines": []
+    },
+    {
+      "section_name": "Final chord (1:55-1:59)",
+      "positive_local_styles": [
+        "one big sustained major chord",
+        "long ring out",
+        "reverb tail",
+        "resolution"
+      ],
+      "negative_local_styles": [
+        "new rhythm",
+        "abrupt cut"
+      ],
+      "duration_ms": 4000,
+      "lines": []
+    }
+  ]
+}

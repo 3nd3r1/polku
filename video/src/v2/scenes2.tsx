@@ -541,28 +541,142 @@ export const F_Nurse: React.FC = () => {
 };
 
 /* ------------------------------------------------------------------ */
-/* 1:25-1:32  Hard cut. Call 112.                                       */
+/* 1:25-1:33  Same line, another caller. The emergency rule fires.      */
+/* Same layout as the Matti call, so it reads as the product working.   */
 /* ------------------------------------------------------------------ */
+export const G_TIMES = { ruleAt: 1.9, voAt: 3.8 } as const;
+const SAYS_112: Say[] = [
+  { from: s(0.2), to: s(1.9), who: "caller", text: "I'm coughing up a lot of blood. Right now." },
+  // Verbatim from src/ontology/engine.ts, the call_112 outcome. Not voiced: the VO carries the beat.
+  { from: s(2.1), to: s(3.7), who: "agent", text: "Please hang up and call 112 now." },
+];
+
 export const G_112: React.FC = () => {
   const f = useCurrentFrame();
+  const say = SAYS_112.find((x) => f >= x.from && f < x.to);
+  const symAt = s(1.0) + 14; // lands with the Fly, as in the Matti call
+  const ruleAt = s(G_TIMES.ruleAt);
+  const voAt = s(G_TIMES.voAt);
+  const fired = f >= ruleAt;
+  const ended = f >= voAt;
+  const alarm = interpolate(f, [ruleAt, ruleAt + 4], [0, 1], clamp);
+  const secs = 41 + Math.floor(f / FPS);
   return (
-    <AbsoluteFill style={{ backgroundColor: C.base, fontFamily: SANS, color: C.fg }}>
-      {/* The frame itself carries the alert: status on a border, not a fill. */}
-      <AbsoluteFill style={{ border: `6px solid ${C.alert}` }} />
-      <div style={{ position: "absolute", left: 96, top: 110 }}>
-        <Label size={17}>Seppo Laine, 80 / synthetic person</Label>
-        <div style={{ fontSize: 38, fontWeight: 300, marginTop: 14 }}>"I'm coughing up a lot of blood. Right now."</div>
+    <Frame section="Screening / live call / synthetic person">
+      {/* Status on a border, not a fill. Comes on when the rule fires, not before. */}
+      <AbsoluteFill style={{ border: `6px solid ${C.alert}`, opacity: alarm }} />
+      <Appear at={0} dur={6} style={{ position: "absolute", left: 840, top: 118 }}>
+        <Label size={16}>Same line / another caller</Label>
+      </Appear>
+
+      {/* Phone, left */}
+      <div style={{ position: "absolute", left: 120, top: 190 }}>
+        <Phone w={300} h={600}>
+          <div style={{ position: "absolute", top: 90, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
+            <Label size={15} color={ended ? C.muted : C.ok}>
+              {ended ? "Call ended" : `On the line 00:${pad2(secs)}`}
+            </Label>
+            <Wordmark height={28} />
+            <div style={{ marginTop: 40 }}>
+              <Voice active={!!say} color={say?.who === "caller" ? C.fg : C.alert} />
+            </div>
+            <Label size={13} color={C.dim} style={{ marginTop: 6 }}>
+              {say ? (say.who === "caller" ? "Seppo" : "Polku / AI") : " "}
+            </Label>
+          </div>
+        </Phone>
       </div>
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontSize: 330, fontWeight: 300, color: C.alert, lineHeight: 1, letterSpacing: "-0.02em" }}>Call 112</div>
-        <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 30, opacity: f >= s(0.8) ? 1 : 0 }}>
-          <Square size={11} color={C.alert} />
-          <span style={{ fontSize: 26 }}>Heavy bleeding when coughing</span>
-          <span style={{ fontFamily: MONO, fontSize: 18, color: C.muted }}>RF-112 / enforced in the engine, not the prompt</span>
+
+      {/* Left column: what is being said, then the voice-over in the same slot */}
+      <div style={{ position: "absolute", left: 96, top: 830, width: 700 }}>
+        {say && (
+          <div key={say.from}>
+            <Label size={15} color={say.who === "caller" ? C.fg : C.alert} style={{ marginBottom: 8 }}>
+              {say.who === "caller" ? "Seppo" : "Polku / AI agent"}
+            </Label>
+            <div style={{ fontSize: 32, lineHeight: 1.3, color: C.fg, fontWeight: say.who === "caller" ? 400 : 300 }}>{say.text}</div>
+          </div>
+        )}
+        {ended && (
+          <Appear at={voAt} dur={6}>
+            <Label size={15} style={{ marginBottom: 8 }}>
+              Voice-over
+            </Label>
+            <div style={{ fontSize: 32, lineHeight: 1.3 }}>The AI never decides. Some rules it cannot override.</div>
+          </Appear>
+        )}
+      </div>
+
+      {/* Screening, right */}
+      <div
+        style={{
+          position: "absolute",
+          left: 840,
+          right: 96,
+          top: 170,
+          bottom: 140,
+          border: `1px solid ${fired ? C.alert : C.line}`,
+          backgroundColor: C.panel,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 24px", borderBottom: `1px solid ${C.lineStrong}` }}>
+          <div style={{ fontSize: 24 }}>
+            Seppo Laine <span style={{ color: C.muted }}>/ 80</span>
+          </div>
+          <Label size={14} color={ended ? C.muted : C.ok}>
+            {ended ? "Call ended" : "On the line"}
+          </Label>
         </div>
-      </AbsoluteFill>
-      <Subtitle from={s(1.6)} to={s(5.5)} speaker="Voice-over" text="The AI never decides. Some rules it cannot override." bottom={120} />
-    </AbsoluteFill>
+        <Row k="Identify caller">
+          <span style={{ fontSize: 22 }}>
+            <span style={{ color: C.ok }}>Identified</span> <span style={{ color: C.muted }}>/ Mobile ID, simulated</span>
+          </span>
+        </Row>
+        <Row k="Symptoms">
+          {f < symAt ? (
+            <span style={{ color: C.dim, fontSize: 22 }}>Nothing recorded yet.</span>
+          ) : (
+            <Appear at={symAt} dur={6}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Square size={10} color={C.alert} />
+                <span style={{ fontSize: 24 }}>Heavy bleeding when coughing</span>
+                <span style={{ fontFamily: MONO, fontSize: 15, color: C.alert, border: `1px solid ${C.alert}`, padding: "2px 8px", letterSpacing: "0.08em" }}>
+                  RED FLAG
+                </span>
+              </div>
+              <div style={{ fontSize: 19, color: C.muted, margin: "4px 0 0 22px" }}>"coughing up a lot of blood. Right now."</div>
+            </Appear>
+          )}
+        </Row>
+        <Row k="Result">
+          {!fired ? (
+            <span style={{ color: C.dim, fontSize: 22 }}>Nothing decided yet.</span>
+          ) : (
+            <div>
+              <Appear at={ruleAt} dur={5}>
+                <Label size={16} color={C.alert}>
+                  Emergency rule RF-112 matched
+                </Label>
+              </Appear>
+              <Appear at={ruleAt + 4} dur={6}>
+                <div style={{ fontSize: 120, fontWeight: 300, color: C.alert, lineHeight: 1.05, letterSpacing: "-0.02em", marginTop: 6 }}>Call 112</div>
+              </Appear>
+              <Appear at={ruleAt + 14} dur={6}>
+                <div style={{ fontSize: 22, color: C.fg, marginTop: 10 }}>No more questions. No nurse queue.</div>
+                <div style={{ fontSize: 19, color: C.muted, marginTop: 6 }}>Hard rule in the engine. The model cannot turn it off.</div>
+              </Appear>
+            </div>
+          )}
+        </Row>
+        <div style={{ position: "absolute", bottom: 14, left: 24 }}>
+          <Label size={13} color={C.dim}>
+            The model only extracts. A rule decides. Synthetic people only.
+          </Label>
+        </div>
+      </div>
+
+      <Fly at={s(1.0)} text="a lot of blood" from={[96, 880]} to={[1100, 325]} />
+    </Frame>
   );
 };
 
@@ -686,68 +800,141 @@ export const H_Map: React.FC = () => {
 };
 
 /* ------------------------------------------------------------------ */
-/* 1:47-1:53  Pathway-as-code flash                                     */
+/* 1:47-1:59  The ending. Three hits on the beat, a breath, the drop:   */
+/* the logo slams, the path fills step by step, the deck's last line.   */
+/* Timed to the score at 120 BPM: the drop is at END_TIMES.drop.        */
 /* ------------------------------------------------------------------ */
-const CODE2 = [
-  "steps: [",
-  '  { id: "callback",          maxDays: 2,  sourceId: "POLKU"  },',
-  '  { id: "primary_assessment", maxDays: 10, sourceId: "SE-SVF", requires: "ct" },',
-  '  { id: "referral",          maxDays: 2,  sourceId: "SE-SVF" },',
-  '  { id: "first_visit",       maxDays: 5,  sourceId: "SE-SVF", requires: "pulmonology" },',
-  '  { id: "diagnostics",       maxDays: 21, sourceId: "SE-SVF" },',
-  '  { id: "mdt_decision",      maxDays: 2,  sourceId: "SE-SVF" },',
-  '  { id: "treatment_start",   maxDays: 14, sourceId: "SE-SVF" },',
-  "]",
-];
+// Scene-local seconds. The score's kicks land at x.15 / x.65 here (measured), so every hit is on a kick.
+export const END_TIMES = { hits: [0.15, 1.15, 2.15], breath: 3.65, drop: 4.15, vo: 5.0 } as const;
 
-export const I_Code: React.FC = () => {
+/** Closed-form damped spring step, 0 -> 1. z < 1 gives the tiny overshoot. */
+const spring01 = (t: number, w = 22, z = 0.72) => {
+  if (t <= 0) return 0;
+  const wd = w * Math.sqrt(1 - z * z);
+  return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + ((z * w) / wd) * Math.sin(wd * t));
+};
+
+const HITS: { text: string; accent?: string }[] = [
+  { text: "One phone call." },
+  { text: "One rule, with a source." },
+  { text: "One promise, kept.", accent: "kept." },
+];
+// VO word onsets (k-vo-close.mp3, measured): first half 0-2.3 s, second half 2.48-4.9 s.
+const CLOSE_1 = "Let's close the path of oncology".split(" ");
+const CLOSE_2 = "with ontology and sovereign AI.".split(" ");
+
+const Word: React.FC<{ at: number; children: React.ReactNode; color?: string }> = ({ at, children, color }) => {
   const f = useCurrentFrame();
+  const e = spring01((f - at) / FPS, 26, 1);
   return (
-    <AbsoluteFill style={{ backgroundColor: C.base, fontFamily: SANS, color: C.fg }}>
-      <div style={{ position: "absolute", left: 96, top: 150 }}>
-        <Label size={18} style={{ marginBottom: 20 }}>
-          src/pathways/lung.ts
-        </Label>
-        {CODE2.map((l, i) => {
-          const o = interpolate(f, [2 + i * 2, 6 + i * 2], [0, 1], clamp);
-          const parts = l.split(/(sourceId: "[A-Z-]+")/);
-          return (
-            <pre key={i} style={{ margin: 0, fontFamily: MONO, fontSize: 27, lineHeight: 1.6, opacity: o, color: C.fg }}>
-              {parts.map((p, j) => (
-                <span key={j} style={{ color: p.startsWith("sourceId") ? C.info : undefined }}>
-                  {p}
-                </span>
-              ))}
-            </pre>
-          );
-        })}
-      </div>
-      <Appear at={s(1.4)} dur={8} style={{ position: "absolute", left: 96, top: 760 }}>
-        <Label size={30} color={C.fg}>
-          open · cited · runs in Europe
-        </Label>
-      </Appear>
-      <Subtitle from={s(0.7)} to={s(5.6)} speaker="Voice-over" text="One typed, cited definition per cancer. A sovereign ontology." bottom={120} />
-    </AbsoluteFill>
+    <span style={{ display: "inline-block", opacity: e, filter: `blur(${(1 - e) * 8}px)`, transform: `translateY(${(1 - e) * 14}px)`, color, marginRight: "0.26em" }}>
+      {children}
+    </span>
   );
 };
 
-/* ------------------------------------------------------------------ */
-/* 1:53-1:58  Logo. "Every cancer pathway, on the clock."               */
-/* ------------------------------------------------------------------ */
-export const J_Logo: React.FC = () => {
+export const K_End: React.FC = () => {
+  const f = useCurrentFrame();
+  const t = f / FPS;
+  const { hits, breath, drop, vo } = END_TIMES;
+  // Hit lines: each one slams in on its beat and is blurred away by the next.
+  const hit = t < breath ? HITS.findIndex((_, i) => t >= hits[i] && (i === HITS.length - 1 || t < hits[i + 1])) : -1;
+  const dropped = t >= drop;
+  const logo = spring01(t - drop, 20, 0.7);
+  const flash = interpolate(t, [drop, drop + 0.25], [0.16, 0], clamp);
+  // The path: a hairline draws out from the centre, then 7 steps fill on the beat.
+  const pathW = 1100 * interpolate(t, [drop + 0.05, drop + 0.7], [0, 1], { ...clamp, easing: ease });
+  const steps = 7;
+  const outro = interpolate(t, [11.4, 12], [1, 0], clamp);
   return (
-    <AbsoluteFill style={{ backgroundColor: C.base, fontFamily: SANS, color: C.fg, alignItems: "center", justifyContent: "center" }}>
-      <Appear at={0} dur={8}>
-        <Wordmark height={120} />
-      </Appear>
-      <Appear at={s(0.5)} dur={8} style={{ marginTop: 60 }}>
-        <div style={{ fontSize: 62, fontWeight: 300 }}>Every cancer pathway, on the clock.</div>
-      </Appear>
-      <Subtitle from={s(0.6)} to={s(4.95)} speaker="Voice-over" text="By 2028, says the strategy. We built one this weekend." bottom={150} />
-      <div style={{ position: "absolute", left: 96, bottom: 70 }}>
-        <Label size={16}>Junction 2026 / AstraZeneca: Equal Care Across Finland / synthetic data only</Label>
-      </div>
+    <AbsoluteFill style={{ backgroundColor: C.base, fontFamily: SANS, color: C.fg, alignItems: "center", justifyContent: "center", opacity: outro }}>
+      {hit >= 0 && (
+        <div key={hit} style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {(() => {
+            const at = hits[hit];
+            const e = spring01(t - at, 30, 0.75);
+            const next = hit < HITS.length - 1 ? hits[hit + 1] : breath;
+            const x = interpolate(t, [next - 0.1, next], [0, 1], clamp);
+            const h = HITS[hit];
+            const [pre, acc] = h.accent ? [h.text.slice(0, -h.accent.length), h.accent] : [h.text, ""];
+            return (
+              <div
+                style={{
+                  fontSize: 132,
+                  fontWeight: 300,
+                  letterSpacing: "-0.02em",
+                  opacity: Math.min(1, e * 1.4) * (1 - x),
+                  filter: `blur(${(1 - Math.min(1, e)) * 10 + x * 12}px)`,
+                  transform: `scale(${1.12 - 0.12 * e})`,
+                }}
+              >
+                {pre}
+                {acc && <span style={{ color: C.ok }}>{acc}</span>}
+              </div>
+            );
+          })()}
+          <div style={{ position: "absolute", top: 300, fontFamily: MONO, fontSize: 22, color: C.muted, letterSpacing: "0.2em" }}>
+            {HITS.map((_, i) => (
+              <span key={i} style={{ color: i <= hit ? C.fg : C.lineStrong, margin: "0 14px" }}>
+                0{i + 1}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {dropped && (
+        <>
+          <AbsoluteFill style={{ backgroundColor: C.fg, opacity: flash }} />
+          <div style={{ position: "absolute", top: 250, opacity: Math.min(1, logo * 1.5), transform: `scale(${1.3 - 0.3 * logo})`, filter: `blur(${Math.max(0, 1 - logo * 1.6) * 14}px)` }}>
+            <Wordmark height={150} />
+          </div>
+          {/* The path */}
+          <div style={{ position: "absolute", top: 520, left: 960 - pathW / 2, width: pathW, height: 2, backgroundColor: C.lineStrong }} />
+          {Array.from({ length: steps }).map((_, i) => {
+            const at = drop + 0.25 + i * 0.25;
+            const on = spring01(t - at, 30, 0.7);
+            const done = t >= at + 0.15;
+            return (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  top: 521 - 9,
+                  left: 960 - 550 + (i * 1100) / (steps - 1) - 9,
+                  width: 18,
+                  height: 18,
+                  backgroundColor: done ? C.ok : C.fg,
+                  opacity: Math.min(1, on * 1.5),
+                  transform: `scale(${on})`,
+                }}
+              />
+            );
+          })}
+          <div style={{ position: "absolute", top: 600, width: 1500, textAlign: "center", fontSize: 64, fontWeight: 300, lineHeight: 1.3 }}>
+            <div>
+              {CLOSE_1.map((w, i) => (
+                <Word key={i} at={s(vo + (i * 2.1) / CLOSE_1.length)}>
+                  {w}
+                </Word>
+              ))}
+            </div>
+            <div>
+              {CLOSE_2.map((w, i) => (
+                <Word key={i} at={s(vo + 2.48 + (i * 2.2) / CLOSE_2.length)} color={w === "ontology" || w === "sovereign" || w === "AI." ? C.ok : undefined}>
+                  {w}
+                </Word>
+              ))}
+            </div>
+          </div>
+          <Appear at={s(9.6)} dur={10} style={{ position: "absolute", bottom: 150, fontFamily: MONO, fontSize: 24, color: C.fg, letterSpacing: "0.06em" }}>
+            polku.ender.fi <span style={{ color: C.dim }}>/</span> github.com/3nd3r1/polku <span style={{ color: C.muted }}>(MIT)</span>
+          </Appear>
+          <Appear at={s(9.9)} dur={10} style={{ position: "absolute", left: 96, bottom: 70 }}>
+            <Label size={16}>Junction 2026 / AstraZeneca: Equal Care Across Finland / synthetic data only</Label>
+          </Appear>
+        </>
+      )}
     </AbsoluteFill>
   );
 };

@@ -120,6 +120,11 @@
       "voice": "narrator",
       "text": "By 2028, says the strategy. We built one this weekend.",
       "speed": 1.12
+    },
+    {
+      "id": "k-vo-close",
+      "voice": "narrator",
+      "text": "Let's close the path of oncology, with ontology and sovereign AI."
     }
   ]
 }

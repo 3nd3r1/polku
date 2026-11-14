@@ -3,11 +3,11 @@ import { AbsoluteFill, Html5Audio, Sequence, interpolate, staticFile, useCurrent
 import { Label } from "../components";
 import { C, FPS, MONO, s } from "../theme";
 import { PeopleCtx } from "./people";
-import { Soundtrack } from "./audio";
-import { A_Table, B_Text, C_Dial, D_Call, E_Promise, F_Nurse, G_112, H_Map, I_Code, J_Logo, PROMISE_CLOCK_START } from "./scenes2";
+import { MusicBed, Soundtrack } from "./audio";
+import { A_Table, B_Text, C_Dial, D_Call, E_Promise, F_Nurse, G_112, H_Map, K_End, PROMISE_CLOCK_START } from "./scenes2";
 
-// docs/story-and-demo.md, "Video (2:00 hard cap)". Beat timings kept; the last
-// two beats are 1 s shorter each so the cut lands at 1:58, under the cap.
+// docs/story-and-demo.md, "Video (2:00 hard cap)". The code flash and the old logo card are
+// replaced by one 12 s ending timed to the score; the cut lands at 1:59, under the cap.
 export const SCENES2 = [
   { id: "A-table", sec: 12, C: A_Table }, // 0:00-0:12
   { id: "B-text", sec: 10, C: B_Text }, // 0:12-0:22
@@ -15,10 +15,9 @@ export const SCENES2 = [
   { id: "D-call", sec: 35, C: D_Call }, // 0:30-1:05
   { id: "E-promise", sec: 7, C: E_Promise }, // 1:05-1:12
   { id: "F-nurse", sec: 13, C: F_Nurse }, // 1:12-1:25
-  { id: "G-112", sec: 7, C: G_112 }, // 1:25-1:32
-  { id: "H-map", sec: 15, C: H_Map }, // 1:32-1:47
-  { id: "I-code", sec: 6, C: I_Code }, // 1:47-1:53
-  { id: "J-logo", sec: 5, C: J_Logo }, // 1:53-1:58
+  { id: "G-112", sec: 8, C: G_112 }, // 1:25-1:33
+  { id: "H-map", sec: 14, C: H_Map }, // 1:33-1:47
+  { id: "K-end", sec: 12, C: K_End }, // 1:47-1:59
 ] as const;
 
 const starts: number[] = [];
@@ -84,6 +83,7 @@ export const PolkuVideo2: React.FC<{ people?: boolean }> = ({ people = false }) 
       <Html5Audio src={staticFile("v2/ring.wav")} />
     </Sequence>
     <Soundtrack people={people} sceneStart={at} />
+    <MusicBed people={people} sceneStart={at} scenes={SCENES2.map((x) => x.id)} />
     <Counter2 />
   </AbsoluteFill>
   </PeopleCtx.Provider>
