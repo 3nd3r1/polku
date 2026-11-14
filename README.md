@@ -23,7 +23,7 @@ Patients only ever use a phone. All screens are for staff:
 | Nurse (`/nurse`) | Callback nurse | Cases to call back, step clocks, the next action |
 | Cockpit | County | Not built yet |
 
-No microphone? "Play a call" on the Screening screen runs scripted synthetic callers through the same API, including an impostor who tries to skip identification. Demo identity codes are in `agent/README.md`.
+No microphone? On the demo site, "Play a call" on `/demo` runs scripted synthetic callers through the same API, including an impostor who tries to skip identification. Demo identity codes are in `agent/README.md`.
 
 ## Run it
 
@@ -47,7 +47,7 @@ npm run up                   # http://localhost:3000
 
 Without npm: `docker compose --env-file .env.local up --build`.
 
-Voice calls need an ElevenLabs agent, see `agent/README.md`.
+Voice calls need an ElevenLabs agent, see `agent/README.md`. To call the real number, see `docs/phone-demo.md`.
 
 The real phone line is a Twilio number on ElevenLabs answered by "Polku Phone", a copy of the agent whose tools are webhooks to `/api/phone/[tool]` on production. `npm run agent:phone` (after `agent:push`) creates or updates it and points the number at it. When the nurse accepts times, production rings `DEMO_CALLBACK_NUMBER`. The Twilio account is a trial: it only calls verified numbers and plays a trial notice first (press any key).
 

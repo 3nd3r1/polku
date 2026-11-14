@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { DEMO_SITE } from "@/demo/site";
 import { usePhone } from "./agent-call";
 
 const TABS = [
@@ -41,7 +42,9 @@ export function Nav() {
             </button>
           </span>
         )}
-        {tab("/demo", "Demo", "font-mono text-xs uppercase tracking-[0.08em]")}
+        {/* Demo tools: only on the public demo site and in local development, never on production. */}
+        {(DEMO_SITE || process.env.NODE_ENV === "development") &&
+          tab("/demo", "Demo", "font-mono text-xs uppercase tracking-[0.08em]")}
       </div>
     </nav>
   );
