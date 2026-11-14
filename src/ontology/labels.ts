@@ -49,3 +49,35 @@ export const spokenDayTime = (d: Date) =>
     minute: "2-digit",
     timeZone: "Europe/Helsinki",
   });
+
+/** Short step names for staff screens. No internal ids on screen. */
+export const STEP_LABEL: Record<string, string> = {
+  callback: "Nurse callback",
+  primary_assessment: "CT scan",
+  referral: "Referral review",
+  first_visit: "Lung specialist",
+  diagnostics: "Further tests",
+  mdt_decision: "Treatment decision",
+  treatment_start: "Treatment start",
+};
+
+/** Steps the patient does not attend: booked by staff, no SMS to the patient. */
+export const STAFF_ONLY_STEPS: readonly string[] = ["referral", "mdt_decision"];
+
+/** "Mon 16.11 10:30" in Finnish time, for server-written log lines. */
+export function shortDayTime(d: Date) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "Europe/Helsinki",
+    })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  );
+  return `${p.weekday} ${p.day}.${p.month} ${p.hour}:${p.minute}`;
+}

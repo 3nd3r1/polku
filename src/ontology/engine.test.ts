@@ -159,3 +159,12 @@ describe("pathway integrity", () => {
     expect(total).toBe(44);
   });
 });
+
+describe("spoken promise", () => {
+  it("states the exact callback deadline in Finnish time", () => {
+    const e = run({ age: 71, smoking: "former", observations: [{ code: "COUGH_NEW", durationDays: 49, quote: "seven weeks" }] });
+    const said = sayThis(e, lung, new Date("2026-11-16T12:04:00Z"));
+    expect(said).toContain("A nurse will call you by Monday 16 November at 14:04.");
+    expect(said).toContain("This is not a diagnosis.");
+  });
+});

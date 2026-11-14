@@ -6,6 +6,8 @@ import type { Person } from "../sim/people";
 export const CHANNELS = ["web_call", "phone", "sample"] as const;
 export const CALL_STATUSES = ["ringing", "verifying", "verified", "screened", "ended"] as const;
 export const TOOLS = ["verify_identity", "get_case", "record_intake"] as const;
+/** What the server decided on a tool call. "ask" = not clear enough yet, the agent asks again. */
+export const VERDICTS = ["allowed", "refused", "ask"] as const;
 export const CASE_STATUSES = ["pending_review", "active", "dismissed", "completed", "advised"] as const;
 
 /** Population register. SYNTHETIC: test-range identity codes only (see src/sim/people.ts). */
@@ -44,6 +46,7 @@ export const accessLog = pgTable("access_log", {
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   tool: text("tool", { enum: TOOLS }).notNull(),
   allowed: boolean("allowed").notNull(),
+  verdict: text("verdict", { enum: VERDICTS }),
   detail: text("detail").notNull(),
 });
 
@@ -79,6 +82,9 @@ export const clocks = pgTable("clocks", {
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
   stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+  /** Slot offered to the patient by SMS, waiting for their reply. */
+  offeredAt: timestamp("offered_at", { withTimezone: true }),
+  offeredSlot: jsonb("offered_slot").$type<{ at: string; unit: string }>(),
   /** Booked appointment for this step, if any. */
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   unit: text("unit"),
@@ -92,6 +98,6 @@ export const audit = pgTable("audit", {
     .references(() => cases.id, { onDelete: "cascade" }),
   at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   action: text("action").notNull(),
-  actor: text("actor", { enum: ["system", "nurse"] }).notNull(),
+  actor: text("actor", { enum: ["system", "nurse", "patient"] }).notNull(),
   data: jsonb("data"),
 });

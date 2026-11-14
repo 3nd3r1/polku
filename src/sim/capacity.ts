@@ -52,3 +52,15 @@ export function slotsFor(countyName: string | null, stepId: string, now = new Da
     .sort((a, b) => a.at.localeCompare(b.at))
     .slice(0, 4);
 }
+
+/**
+ * The slot the system recommends for a step: the earliest one before the
+ * step's due time, else the earliest one at all (and it says it is late).
+ * A rule, not the model. Availability is SYNTHETIC.
+ */
+export function recommendSlot(countyName: string | null, stepId: string, dueAt: Date, now = new Date()) {
+  const slots = slotsFor(countyName, stepId, now);
+  const onTime = slots.find((s) => new Date(s.at) <= dueAt);
+  const slot = onTime ?? slots[0];
+  return slot ? { at: slot.at, unit: slot.unit, onTime: Boolean(onTime) } : null;
+}

@@ -268,7 +268,7 @@ function ScreeningInner() {
 }
 
 function CallState({ c }: { c: CallView }) {
-  const refused = c.access.some((e) => !e.allowed);
+  const refused = c.access.some((e) => e.verdict === "refused");
   const existing = c.case && c.case.callId !== c.id;
   const [text, tone] =
     c.outcome === "call_112"
@@ -305,9 +305,9 @@ function AccessLog({ c }: { c: CallView }) {
         {c.access.map((e, i) => (
           <li key={i} className="flex gap-3">
             <span className="text-dim">{clockTime(e.at, true)}</span>
-            <span className={`w-16 shrink-0 ${e.allowed ? "text-ok" : "text-alert"}`}>{e.allowed ? "allowed" : "refused"}</span>
+            <span className={`w-16 shrink-0 ${(e.verdict !== "refused") ? "text-ok" : "text-alert"}`}>{(e.verdict !== "refused") ? "allowed" : "refused"}</span>
             <span className="w-28 shrink-0 text-muted">{e.tool}</span>
-            <span className={e.allowed ? "" : "text-alert"}>{e.detail}</span>
+            <span className={(e.verdict !== "refused") ? "" : "text-alert"}>{e.detail}</span>
           </li>
         ))}
       </ol>
@@ -320,7 +320,7 @@ function CallDetail({ c }: { c: CallView }) {
   const existing = k !== null && k.callId !== c.id;
   const running = k?.clocks.find((x) => !x.stoppedAt);
   const runningStep = running && lung.steps.find((x) => x.id === running.stepId);
-  const caseRead = c.access.some((e) => e.tool === "get_case" && e.allowed);
+  const caseRead = c.access.some((e) => e.tool === "get_case" && (e.verdict !== "refused"));
   const criterion = k && lung.criteria.find((x) => x.id === k.matches[0]?.criterionId);
   const source = criterion && lung.sources.find((s) => s.id === criterion.sourceId);
   const callback = k?.clocks.find((x) => x.stepId === "callback");
@@ -361,7 +361,7 @@ function CallDetail({ c }: { c: CallView }) {
                 </>
               ) : c.status === "verifying" ? (
                 <p className="text-warn">Mobile ID request sent to the registered phone…</p>
-              ) : c.access.some((e) => !e.allowed) ? (
+              ) : c.access.some((e) => e.verdict === "refused") ? (
                 <p className="text-alert">Not identified. Nothing about any person was released.</p>
               ) : null}
             </Stage>

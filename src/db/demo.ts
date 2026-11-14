@@ -7,6 +7,7 @@ import { sql } from "drizzle-orm";
 import { evaluate } from "../ontology/engine";
 import type { Intake } from "../ontology/schema";
 import { lung } from "../pathways/lung";
+import { recommendSlot } from "../sim/capacity";
 import { ageOf, type Person, syntheticPeople } from "../sim/people";
 import { db } from "./index";
 import { audit, cases, clocks, people } from "./schema";
@@ -20,7 +21,17 @@ const INTAKES: Omit<Intake, "age">[] = [
   { smoking: "never", observations: [{ code: "CHEST_PAIN", quote: "a pain in my chest that won't go away" }] },
 ];
 
-type CaseSeed = { person: Person; intake: Omit<Intake, "age">; stepIndex: number; daysIntoStep: number; booked?: { inDays: number; at: string; unit: string } };
+/** Where the running step stands: booked by staff, SMS offered recently, or SMS offered over 24 h ago with no reply. */
+type Plan = "booked" | "offered" | "no_reply";
+type CaseSeed = {
+  person: Person;
+  intake: Omit<Intake, "age">;
+  stepIndex: number;
+  daysIntoStep: number;
+  booked?: { inDays: number; at: string; unit: string };
+  plan?: Plan;
+};
+const PLANS: (Plan | undefined)[] = ["booked", "offered", "no_reply", undefined, "booked", "offered", undefined, "booked"];
 
 /** Deterministic: same cases on every seed. Some prior steps overran, so some promises are already broken. */
 function caseSeeds(people: Person[]): CaseSeed[] {
@@ -37,6 +48,7 @@ function caseSeeds(people: Person[]): CaseSeed[] {
         intake: INTAKES[i % INTAKES.length],
         stepIndex: i % (lung.steps.length - 1),
         daysIntoStep: (i * 7) % 9,
+        plan: PLANS[i % PLANS.length],
       });
     });
   return seeds;
@@ -96,10 +108,23 @@ export async function resetDemo() {
       const stoppedAt = current ? null : new Date(t + durations[j]);
       const booked = current && s.booked;
       let scheduledAt: Date | null = null;
+      let unit: string | null = null;
+      let offeredAt: Date | null = null;
+      let offeredSlot: { at: string; unit: string } | null = null;
       if (booked) {
         scheduledAt = new Date(now + booked.inDays * DAY_MS);
         const [h, m] = booked.at.split(":").map(Number);
         scheduledAt.setHours(h, m, 0, 0);
+        unit = booked.unit;
+      } else if (current && j > 0 && s.plan) {
+        const slot = recommendSlot(s.person.county, step.id, dueAt, new Date(now));
+        if (slot && s.plan === "booked") {
+          scheduledAt = new Date(slot.at);
+          unit = slot.unit;
+        } else if (slot) {
+          offeredAt = new Date(now - (s.plan === "offered" ? 6 : 30) * 60 * 60 * 1000);
+          offeredSlot = { at: slot.at, unit: slot.unit };
+        }
       }
       await db.insert(clocks).values({
         caseId: row.id,
@@ -107,8 +132,10 @@ export async function resetDemo() {
         startedAt,
         dueAt,
         stoppedAt,
+        offeredAt,
+        offeredSlot,
         scheduledAt,
-        unit: booked ? booked.unit : null,
+        unit,
       });
       if (stoppedAt) {
         await db.insert(audit).values({

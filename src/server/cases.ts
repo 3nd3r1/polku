@@ -4,10 +4,10 @@ import { db } from "../db";
 import { audit, calls, type CASE_STATUSES, cases, clocks, type CHANNELS } from "../db/schema";
 import { missingQuestions } from "../ontology/clarity";
 import { evaluate, sayThis, type Outcome } from "../ontology/engine";
-import { spokenDayTime, STEP_SPOKEN } from "../ontology/labels";
+import { shortDayTime, spokenDayTime, STEP_LABEL, STEP_SPOKEN } from "../ontology/labels";
 import type { Intake } from "../ontology/schema";
 import { lung } from "../pathways/lung";
-import { slotsFor } from "../sim/capacity";
+import { recommendSlot } from "../sim/capacity";
 import { ageOf, type Person } from "../sim/people";
 import { publishChange } from "./bus";
 import { ActionError } from "./errors";
@@ -28,6 +28,13 @@ async function startClock(tx: Tx, caseId: string, stepId: StepId, now: Date) {
 }
 
 const OPEN: (typeof CASE_STATUSES)[number][] = ["pending_review", "active"];
+
+const OUTCOME_LOG: Record<Outcome, string> = {
+  fast_track: "Rules: fast track, nurse callback set",
+  call_112: "Emergency rule: call 112",
+  see_gp: "Rules: no fast track, see a GP",
+  no_match: "Rules: no criterion matched",
+};
 
 async function openCaseOf(personId: string) {
   const [c] = await db
@@ -67,7 +74,7 @@ export async function getCase(callId: string) {
   const { person } = await requireIdentified(callId, "get_case");
   const open = await openCaseOf(person.id);
   if (!open) {
-    await logAccess(callId, "get_case", true, "Read own record: no open case");
+    await logAccess(callId, "get_case", "allowed", "Own record only: no open case");
     publishChange();
     return { summary: null, sayThis: "The caller has no open case. Ask what symptoms they have been having." };
   }
@@ -75,7 +82,10 @@ export async function getCase(callId: string) {
   const summary = clock ? caseStatusSentence(clock) : "Your case is open with the care team.";
   await db.update(calls).set({ caseId: open.id }).where(eq(calls.id, callId));
   await db.insert(audit).values({ caseId: open.id, action: "CallerCheckedStatus", actor: "system", data: { callId } });
-  await logAccess(callId, "get_case", true, `Read own open case (${clock ? clock.stepId : open.status})`);
+  const where = clock
+    ? `${STEP_LABEL[clock.stepId]}, ${clock.scheduledAt ? `booked ${shortDayTime(clock.scheduledAt)}` : `due ${shortDayTime(clock.dueAt)}`}`
+    : "open";
+  await logAccess(callId, "get_case", "allowed", `Own record only: ${where}`);
   publishChange();
   return {
     summary,
@@ -91,13 +101,15 @@ export async function getCase(callId: string) {
 export async function submitIntake(raw: Intake, channel: (typeof CHANNELS)[number], callId: string) {
   const { call, person } = await requireIdentified(callId, "record_intake");
   if (call.outcome) {
-    throw await refuse(callId, "record_intake", "Refused: already recorded on this call", "Already recorded on this call. Say goodbye.", 409);
+    throw await refuse(callId, "record_intake", "Already recorded on this call", "Already recorded on this call. Say goodbye.", 409);
   }
   const intake: Intake = { ...raw, age: ageOf(person) };
 
   // The intake must be clear enough to evaluate. The agent asks, then calls again.
   const questions = missingQuestions(intake);
   if (questions.length > 0) {
+    await logAccess(callId, "record_intake", "ask", `Not clear yet. ${questions.join(" ")}`);
+    publishChange();
     throw new ActionError(`Not recorded yet. ${questions.join(" ")} Then call record_intake again with everything.`, 422);
   }
 
@@ -128,7 +140,7 @@ async function addToOpenCase(
     });
     await tx.update(calls).set({ status: "screened", caseId: open.id, outcome: evaluation.outcome }).where(eq(calls.id, callId));
   });
-  await logAccess(callId, "record_intake", true, `Added ${intake.observations.length} symptom(s) to own open case`);
+  await logAccess(callId, "record_intake", "allowed", "Added to own open case");
   publishChange();
   return {
     caseId: open.id,
@@ -186,18 +198,24 @@ async function openNewCase(
     await tx.update(calls).set({ status: "screened", caseId: row.id, outcome: evaluation.outcome }).where(eq(calls.id, callId));
     return row.id;
   });
-  await logAccess(callId, "record_intake", true, `Recorded intake: new case (${evaluation.outcome.replace("_", " ")})`);
+  await logAccess(callId, "record_intake", "allowed", OUTCOME_LOG[evaluation.outcome]);
 
   publishChange();
   return {
     caseId,
     outcome: evaluation.outcome satisfies Outcome,
-    sayThis: sayThis(evaluation, lung),
+    sayThis: sayThis(evaluation, lung, (callbackDueAt as Date | null) ?? undefined),
     callbackDueAt: (callbackDueAt as Date | null)?.toISOString() ?? null,
   };
 }
 
 export const CaseAction = z.enum(["confirm", "advance", "dismiss"]);
+
+function recommendationFor(r: typeof cases.$inferSelect, clockRows: Clock[]): Recommendation | null {
+  const k = clockRows.find((x) => x.caseId === r.id && !x.stoppedAt);
+  if (!k || k.scheduledAt || r.status !== "active") return null;
+  return recommendSlot(r.county, k.stepId, k.dueAt);
+}
 export type CaseAction = z.infer<typeof CaseAction>;
 
 const ACTION_RULES = {
@@ -245,26 +263,57 @@ export async function applyCaseAction(caseId: string, action: CaseAction, notes?
   publishChange();
 }
 
-/** BookAppointment: attach one of the county's free slots to the running step. */
-export async function bookSlot(caseId: string, slotId: string) {
-  await db.transaction(async (tx) => {
-    const [c] = await tx.select().from(cases).where(eq(cases.id, caseId)).for("update");
-    if (!c) throw new ActionError("Case not found", 404);
-    const [open] = await tx
-      .select()
-      .from(clocks)
-      .where(and(eq(clocks.caseId, caseId), isNull(clocks.stoppedAt)));
-    if (!open || c.status !== "active") throw new ActionError("No step to book", 409);
-    const slot = slotsFor(c.county, open.stepId).find((s) => s.id === slotId);
-    if (!slot) throw new ActionError("Slot is no longer available", 409);
+/** The running step's clock, locked for update, on an active case. */
+async function lockRunningStep(tx: Tx, caseId: string) {
+  const [c] = await tx.select().from(cases).where(eq(cases.id, caseId)).for("update");
+  if (!c) throw new ActionError("Case not found", 404);
+  const [open] = await tx
+    .select()
+    .from(clocks)
+    .where(and(eq(clocks.caseId, caseId), isNull(clocks.stoppedAt)));
+  if (!open || c.status !== "active") throw new ActionError("No step to schedule", 409);
+  if (open.scheduledAt) throw new ActionError("Already booked", 409);
+  return { c, open };
+}
 
+/** RecommendSlot + OfferSlot: the system picks the slot, the nurse sends it to the patient by SMS (simulated). */
+export async function offerSlot(caseId: string) {
+  await db.transaction(async (tx) => {
+    const { c, open } = await lockRunningStep(tx, caseId);
+    const slot = recommendSlot(c.county, open.stepId, open.dueAt);
+    if (!slot) throw new ActionError("No free slot for this step", 409);
+    await tx
+      .update(clocks)
+      .set({ offeredAt: new Date(), offeredSlot: { at: slot.at, unit: slot.unit } })
+      .where(eq(clocks.id, open.id));
+    await tx.insert(audit).values([
+      { caseId, action: "RecommendSlot", actor: "system", data: { stepId: open.stepId, ...slot } },
+      { caseId, action: "OfferSlot", actor: "nurse", data: { stepId: open.stepId, channel: "sms" } },
+    ]);
+  });
+  publishChange();
+}
+
+/** ConfirmSlot: the patient replied YES to the SMS (simulated). Books the offered slot as offered. */
+export async function confirmOffer(caseId: string) {
+  await db.transaction(async (tx) => {
+    const { open } = await lockRunningStep(tx, caseId);
+    if (!open.offeredSlot) throw new ActionError("Nothing offered", 409);
+    const { at, unit } = open.offeredSlot;
+    await tx.update(clocks).set({ scheduledAt: new Date(at), unit }).where(eq(clocks.id, open.id));
+    await tx.insert(audit).values({ caseId, action: "ConfirmSlot", actor: "patient", data: { stepId: open.stepId, at, unit } });
+  });
+  publishChange();
+}
+
+/** BookAppointment: staff book the recommended slot directly (staff-only steps, or no reply to the SMS). */
+export async function bookRecommended(caseId: string) {
+  await db.transaction(async (tx) => {
+    const { c, open } = await lockRunningStep(tx, caseId);
+    const slot = recommendSlot(c.county, open.stepId, open.dueAt);
+    if (!slot) throw new ActionError("No free slot for this step", 409);
     await tx.update(clocks).set({ scheduledAt: new Date(slot.at), unit: slot.unit }).where(eq(clocks.id, open.id));
-    await tx.insert(audit).values({
-      caseId,
-      action: "BookAppointment",
-      actor: "nurse",
-      data: { stepId: open.stepId, at: slot.at, unit: slot.unit },
-    });
+    await tx.insert(audit).values({ caseId, action: "BookAppointment", actor: "nurse", data: { stepId: open.stepId, ...slot } });
   });
   publishChange();
 }
@@ -274,9 +323,13 @@ export type ClockView = {
   startedAt: string;
   dueAt: string;
   stoppedAt: string | null;
+  offeredAt: string | null;
+  offeredSlot: { at: string; unit: string } | null;
   scheduledAt: string | null;
   unit: string | null;
 };
+/** The slot the system recommends for the running step (synthetic availability). */
+export type Recommendation = { at: string; unit: string; onTime: boolean };
 export type CaseView = {
   id: string;
   callId: string | null;
@@ -290,6 +343,7 @@ export type CaseView = {
   intake: Intake;
   matches: { criterionId: string; observationIndex: number }[];
   clocks: ClockView[];
+  recommended: Recommendation | null;
 };
 
 export async function listCases(limit = 50): Promise<CaseView[]> {
@@ -328,8 +382,11 @@ export async function toCaseViews(rows: (typeof cases.$inferSelect)[]): Promise<
         startedAt: k.startedAt.toISOString(),
         dueAt: k.dueAt.toISOString(),
         stoppedAt: k.stoppedAt?.toISOString() ?? null,
+        offeredAt: k.offeredAt?.toISOString() ?? null,
+        offeredSlot: k.offeredSlot,
         scheduledAt: k.scheduledAt?.toISOString() ?? null,
         unit: k.unit,
       })),
+    recommended: recommendationFor(r, clockRows),
   }));
 }

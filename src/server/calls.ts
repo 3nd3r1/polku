@@ -32,7 +32,7 @@ export async function appendTranscript(callId: string, role: TranscriptLine["rol
   publishChange();
 }
 
-export type AccessEntry = { at: string; tool: string; allowed: boolean; detail: string };
+export type AccessEntry = { at: string; tool: string; verdict: "allowed" | "refused" | "ask"; detail: string };
 
 export type CallView = {
   id: string;
@@ -65,7 +65,7 @@ export async function listCalls(limit = 30): Promise<CallView[]> {
     transcript: r.transcript,
     access: log
       .filter((l) => l.callId === r.id)
-      .map((l) => ({ at: l.at.toISOString(), tool: l.tool, allowed: l.allowed, detail: l.detail })),
+      .map((l) => ({ at: l.at.toISOString(), tool: l.tool, verdict: l.verdict ?? (l.allowed ? "allowed" : "refused"), detail: l.detail })),
     case: caseViews.find((c) => c.id === r.caseId) ?? null,
   }));
 }

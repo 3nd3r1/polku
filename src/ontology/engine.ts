@@ -1,3 +1,4 @@
+import { spokenDayTime } from "./labels";
 import { LEVELS, type Criterion, type Intake, type Level, type Observation, type Pathway } from "./schema";
 
 export type Outcome = "call_112" | "fast_track" | "see_gp" | "no_match";
@@ -47,8 +48,11 @@ export function evaluate(intake: Intake, pathway: Pathway): Evaluation {
   return { outcome: top ? OUTCOME_BY_LEVEL[top.criterion.level] : "no_match", matches };
 }
 
-/** What the voice agent says back. Fixed text, never generated. */
-export function sayThis(evaluation: Evaluation, pathway: Pathway): string {
+/**
+ * What the voice agent says back. Fixed text, never generated. With the
+ * callback deadline the caller hears the exact time the screen counts down to.
+ */
+export function sayThis(evaluation: Evaluation, pathway: Pathway, callbackDueAt?: Date): string {
   const callback = pathway.steps.find((s) => s.id === "callback");
   switch (evaluation.outcome) {
     case "call_112":
@@ -56,7 +60,8 @@ export function sayThis(evaluation: Evaluation, pathway: Pathway): string {
     case "fast_track": {
       const c = evaluation.matches[0].criterion;
       const source = pathway.sources.find((s) => s.id === c.sourceId);
-      return `Your symptoms match a published criterion for a fast-track assessment: ${c.gloss.toLowerCase()} (source: ${source?.spokenName ?? c.sourceId}). This is not a diagnosis. A nurse will call you within ${callback?.maxDays ?? 2} days.`;
+      const when = callbackDueAt ? `by ${spokenDayTime(callbackDueAt)}` : `within ${callback?.maxDays ?? 2} days`;
+      return `Your symptoms match a published criterion for a fast-track assessment, from ${source?.spokenName ?? c.sourceId}. This is not a diagnosis. A nurse will call you ${when}.`;
     }
     case "see_gp":
       return "Your symptoms don't match a fast-track criterion, but they are worth checking. Please book an appointment at your health centre.";
