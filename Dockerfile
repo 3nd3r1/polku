@@ -3,6 +3,8 @@
 FROM node:22-alpine
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# Clocks, slots and the seed use local time: make it Finnish whatever the host is.
+ENV TZ=Europe/Helsinki
 
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
