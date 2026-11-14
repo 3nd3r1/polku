@@ -90,12 +90,12 @@ const web = await api<Agent>("GET", `/agents/${webAgentId}`);
 web.conversation_config.agent.prompt.tool_ids = AGENT_TOOLS.map((t) => ids.tools[t.name]);
 delete web.conversation_config.agent.prompt.tools; // the GET returns both; create accepts one
 
-// Model. Default: Gemini hosted by ElevenLabs, fast and reliable on the phone; the transcript
-// arrives with each tool call and in full when the call ends.
-// PHONE_LLM=proxy: our /api/llm, which forwards each turn to Qwen3 on Verda and writes the
+// Model. Default: our /api/llm, which forwards each turn to Qwen3 on Verda (EU) and writes the
 // transcript live. Its bearer token is PHONE_WEBHOOK_SECRET, held as a workspace secret, and
 // ElevenLabs falls back to hosted Gemini if it is slow or down.
-if (process.env.PHONE_LLM === "proxy") {
+// PHONE_LLM=gemini: Gemini hosted by ElevenLabs only; the transcript then arrives with each
+// tool call and in full when the call ends.
+if (process.env.PHONE_LLM !== "gemini") {
   const secrets = await api<{ secrets: { secret_id: string; name: string }[] }>("GET", "/secrets");
   const secretId =
     secrets.secrets.find((s) => s.name === "polku_llm_proxy")?.secret_id ??

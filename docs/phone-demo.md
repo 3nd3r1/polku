@@ -69,3 +69,4 @@ This wipes production's calls and cases and reseeds the register.
 - **The agent goes quiet or says it hit an error after your code:** a webhook failed. Check the Polku Phone conversation in ElevenLabs, and the Coolify logs.
 - **The callback doesn't ring:** look for `[phone] outbound call failed` in the Coolify logs. Usually the number isn't verified in Twilio, or Finland isn't allowed under Twilio's Geo Permissions.
 - **The agent sounds out of date:** after `npm run agent:push`, run `npm run agent:phone` too.
+- **The model:** Qwen3 on Verda (EU) through our `/api/llm` proxy, which writes the live transcript; ElevenLabs falls back to hosted Gemini if it is down. `PHONE_LLM=gemini npm run agent:phone` switches to hosted Gemini only (faster by about 0.5 s a turn, no live transcript).
