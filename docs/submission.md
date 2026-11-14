@@ -11,37 +11,35 @@ Polku
 ## Punchline
 
 ```
-A phone line that puts every suspected lung cancer patient on the clock, run on a sovereign ontology of published Nordic criteria, with per-county waiting times Finland can't measure today.
+Approve a 90-day county pilot: one phone line, three proposed handoff targets, and a lung cancer pathway measured from the first call to specialist care.
 ```
 
 ## Description
 
 ```markdown
-## The problem
-Finland's national cancer strategy (2026-2035) sets a goal of raising 5-year lung cancer survival by 14 percentage points to reach the Nordic level. Its headline equality indicator, "patients get treatment within target times", can't be measured per wellbeing county today: Finland has no national lung pathway yet, and no public per-county access-time data exists. Meanwhile counties promise different things: Pirkanmaa says CT within about a week of the referral being processed, Keski-Suomi says a specialist within about a month.
+## Recommendation and decision
+We ask one wellbeing county to approve a 90-day pilot with one phone number, one nurse workflow and one pulmonology clinic, to name a clinical sponsor, and to supply a baseline extract of referral and pathway timestamps. The pilot tests three proposed local targets: nurse callback within 2 working days, CT within 7 days of a confirmed referral, and a first pulmonology visit within 21 days. The CT and visit targets follow published county guidance. The callback target is Polku's proposal, not a national or Nordic standard. (Sources: https://www.pirha.fi/asiakkaalle/hoito-ja-palvelupolut/keuhkosyopapotilaan-hoitopolku and https://www.hyvaks.fi/asiakkaana/hoitopolut/keuhkosyopapotilaan-hoitopolku)
 
-## What Polku does
-**1. A phone call is the only patient interface.** Most cancer patients are older, and the best interface for them is the phone they already have. No app, no form. The caller is strongly identified (Mobile ID, simulated in the prototype), then describes their symptoms in their own words to a voice agent.
+## The gap
+65-70 % of lung cancers in Finland are found at an advanced stage. (Source: Filha lung cancer programme 2026-2035, citing the Cancer Registry, https://www.filha.fi/wp-content/uploads/2026/05/Valtakunnallinen-keuhkosyopaohjelma-2026-2035_180526_preprint.pdf)
 
-**2. The AI never triages.** The LLM only turns speech into typed symptom objects, each linked to the caller's exact words. A deterministic rules engine matches them against published Nordic lung cancer pathway criteria (Swedish SVF, Danish and Finnish regional guidance), and every criterion cites its source. Red-flag symptoms always return "call 112", enforced in the engine, not the prompt.
+In 2025, Finland processed 76.8 % of referrals to specialised care within 3 days. Counties ranged from 68.9 % in Etelä-Pohjanmaa to 88.7 % in Kanta-Häme, and Etelä-Pohjanmaa fell from 78.1 % in 2021. This indicator covers all specialities and is reported by the producer of care, so it does not measure the lung pathway. (Source: THL Sotkanet indicator 13, updated 5.6.2026, https://sotkanet.fi/sotkanet/en/metadata/indicators/13)
 
-**3. A nurse decides, and every step runs on a clock.** Matches go to a nurse callback queue with a deadline. The nurse confirms, and each pathway step (assessment, referral, specialist visit, diagnostics, MDT, treatment start) starts its own clock with a sourced target time.
+We found no public county-level lung cancer access-time series. Counties may hold internal data. Denmark and Sweden publish pathway times per region. (Search scope and limits: `docs/lung-pathway-sources.md` in https://github.com/3nd3r1/polku)
 
-**4. Counties see where the delays are.** The clocks roll up per wellbeing county and pathway step: the Goal 3 indicator, measured as a by-product of running care. Polku also records the interval nobody measures today, from symptom onset to first contact.
+## Where to act
+The pilot hypothesis is that delay and unclear ownership sit at the handoffs: first contact to nurse, referral to CT, CT to pulmonology. The baseline extract tests this before any capacity changes.
 
-## Sovereign ontology
-The pathway is code: one typed, versioned definition of criteria, steps and time limits, each citing its source. Patients, cases, criteria, steps and clocks are typed objects, and every change is an audited action with a permitted role. Personal data is meant to stay in the EU on infrastructure we control.
+## How Polku runs and measures it
+A caller describes symptoms to a voice agent, which turns speech into typed symptoms with the caller's own words attached. Deterministic rules match them to published Nordic lung cancer referral criteria, each with its source, and flag emergencies. The language model does not diagnose or set deadlines. A nurse gets one task with a rule-proposed time. On Accept, the agent calls the patient back and books it. The handoff strip shows who holds the patient and every record access.
 
-## Maps to the national roadmap
-- 2.5.2: standardised symptom-based referral criteria
-- 3.1.2: cancer pathways with target access times
-- 3.5.3: digital pathways and symptom assessment
+The county view puts the real numbers next to Polku's own clocks, names the step where promises break and proposes one action with its precedent. The pilot one-pager states what it takes as planning assumptions: about 5 nurse hours a week (10 cases x 30 min) and 2 protected CT slots a week. No saving is forecast.
 
-## Built with
-Next.js, TypeScript, zod, Drizzle and Postgres, ElevenLabs voice agent, deterministic rules engine with tests.
+## National strategy
+The pilot serves roadmap measures 2.5.2 (symptom-based referral criteria), 3.1.2 (pathways with target access times) and 3.5.3 (digital pathways). Its Goal 3 measure is the share of patients who start treatment within a county-agreed target. (Source: national cancer strategy 2026-2035 p.5 and roadmap 2026-2031 pp.52-57 and 73-74, https://files.hackjunction.app/resources/Kansallinen_syopastrategia_2026_2035_FINAL.pdf)
 
 ## Honesty notes
-Synthetic data only. Strong identification is simulated. Prototype, not a medical device in its current form.
+Patients and pathway clocks in the demo are synthetic. The Sotkanet and Filha figures are real public aggregates. Mobile ID is simulated. The voice runs on ElevenLabs today, and EU-only processing is a design goal, not the current state. The callback rings in the browser. This is a research prototype, not for clinical use, and it needs a regulatory assessment before deployment. Clinical effect, workload and equity effects are unproven until a pilot measures them.
 ```
 
 ## Challenge
