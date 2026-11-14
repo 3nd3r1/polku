@@ -45,6 +45,17 @@ npm test                  # engine tests
 
 Voice calls need an ElevenLabs agent. See [`agent/README.md`](agent/README.md).
 
+## Deploy
+
+Live at **https://polku.eros.ender.fi** (Coolify, Dockerfile build, Aiven Postgres). The container applies the schema and seeds the synthetic register on first boot, and runs in Finnish time.
+
+```sh
+nix-shell
+git push && npm run deploy   # Coolify CLI; pushes don't deploy on their own
+npm run demo:reset           # wipe calls and cases on production, reseed (needs ADMIN_TOKEN in .env.local)
+npm run agent:push           # push prompt and tools to the ElevenLabs agent
+```
+
 ## Code map
 
 | Path | What |

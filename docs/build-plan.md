@@ -23,7 +23,7 @@ Status checked against the code Sat 14.11 09:00.
 | **Scripted callers** in Simulate: Matti, Aino, red flag, Liisa (open case), Impostor | Done |
 | **Strong identification gate**: identity code + simulated Mobile ID, synthetic register in Postgres, access log on screen, tests | Done |
 | **Cockpit v1**: county tile grid, "today: not measured" (real) vs "with Polku" (synthetic, labelled), one headline sentence, one recommendation card, live bump from the call | Todo |
-| **Deploy** before the video is recorded | Todo |
+| **Deploy** before the video is recorded | Done: https://polku.eros.ender.fi (Coolify, Aiven Postgres). Deploy-on-push webhook and CI still todo. |
 | 2-minute video | Todo |
 
 | Should (prizes, credibility) | Could | Won't |
@@ -125,7 +125,7 @@ Rules:
 1. Promise + countdown: the engine returns an absolute deadline, the agent speaks it, the UI ticks in seconds. All clocks read one sim time source (needed for 6). (A)
 2. Stage mode for Screening, including the red-flag state. (B)
 4. Cockpit v1: synthetic generator per county, tile grid with the two states, headline sentence, recommendation card, live bump over SSE. (A)
-5. Deploy: VPS via Coolify, Aiven Postgres, CI on CRACI. Before the video, so it's recorded against the real URL. (A)
+5. Deploy: VPS via Coolify with Aiven Postgres (done), CI on CRACI. Before the video, so it's recorded against the real URL. (A)
 6. "+1 day": a promise breaks, an escalation appears on Nurse. (A)
 7. "Why?" trace for one case. (B)
 8. Eval suite + table. (A)
