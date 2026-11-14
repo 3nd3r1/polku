@@ -1,0 +1,19 @@
+{
+    "tools": [
+        {
+            "type": "client",
+            "config": "tool_configs/verify_identity.json",
+            "id": "tool_7501m7cjp55gfzpvv7gn9p9z2crp"
+        },
+        {
+            "type": "client",
+            "config": "tool_configs/get_case.json",
+            "id": "tool_2701m7cjp5kpfd0bb3mdy6swrb4c"
+        },
+        {
+            "type": "client",
+            "config": "tool_configs/record_intake.json",
+            "id": "tool_6401m7cjp64fennarxta7yfctxcx"
+        }
+    ]
+}

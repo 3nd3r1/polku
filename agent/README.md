@@ -2,16 +2,28 @@
 
 The agent only turns speech into tool calls. It knows nothing about the caller until the server tells it, and the server decides what each tool returns (`src/server/identity.ts`). Matching happens in our engine, and the agent reads back the sentence our API returns.
 
-## Setup (ElevenLabs dashboard)
+## Agent as code
 
-1. Create an agent. Paste `prompt.md` as the system prompt. First message: "Hi, this is Polku, the lung symptom line. I'm an AI assistant. To identify you, please tell me your personal identity code."
-2. Add three **client tools**, all with "Wait for response" on. Copy names, descriptions and parameters from `GET /api/intake`, which is generated from the same schemas the server validates with:
-   - `verify_identity` with one string parameter, `hetu`
-   - `get_case` with no parameters
-   - `record_intake`
-3. Turn on the **End call** system tool. The prompt tells the agent to use it after saying goodbye, and the hang-up marks the call as ended on Screening.
-4. Make the agent public (no auth) and set limits: max call duration about 3 minutes, plus a daily call cap.
-5. Put the agent id in `.env.local` as `NEXT_PUBLIC_ELEVENLABS_AGENT_ID`.
+The live agent is **Polku Agent** (`agent_9901m7chdrncehma1fymbn0g6wcp`), managed with the ElevenLabs CLI (`@elevenlabs/cli`, on PATH in `nix-shell`). Never edit it in the dashboard: the next push overwrites it.
+
+| Source | Becomes |
+|---|---|
+| `agent/prompt.md` | System prompt |
+| `FIRST_MESSAGE` in `src/server/agent-tools.ts` | First message |
+| `AGENT_TOOLS` in `src/server/agent-tools.ts` | The three client tools (also served by `GET /api/intake`) |
+| `agent/sync.ts` | `end_call` on, auth off, 5 min max call, 300 calls/day |
+
+To change the agent, edit those and run:
+
+```sh
+nix-shell
+elevenlabs auth login     # once
+npm run agent:push        # sync.ts writes agent_configs/ and tool_configs/, then pushes both
+```
+
+`agents.json` and `tools.json` hold the ElevenLabs ids. Put the agent id in `.env.local` as `NEXT_PUBLIC_ELEVENLABS_AGENT_ID`.
+
+Test from the Screening page (**Call from this browser**), not the ElevenLabs test window: the tools are client tools, so only our page can run them.
 
 The Screening page runs the tools during a browser call. Each one only forwards to the server and returns `sayThis` (or the refusal) to the agent:
 

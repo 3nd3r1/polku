@@ -1,39 +1,12 @@
 import { z } from "zod";
 import { CHANNELS } from "@/db/schema";
 import { Intake } from "@/ontology/schema";
+import { AGENT_TOOLS } from "@/server/agent-tools";
 import { ActionError, submitIntake } from "@/server/cases";
 
-/** Tool definitions for the ElevenLabs agent, generated from the same zod schema we validate with. */
+/** Tool definitions for the voice agent. Same source as `npm run agent:push`. */
 export function GET() {
-  return Response.json([
-    {
-      name: "verify_identity",
-      description:
-        "Strongly identify the caller. Call this first, with the personal identity code (henkilötunnus) the caller says. The server confirms it with Mobile ID. Nothing about the caller is available before this succeeds.",
-      parameters: {
-        type: "object",
-        properties: {
-          hetu: {
-            type: "string",
-            description: "The caller's personal identity code exactly as they said it, format DDMMYY-NNNX, e.g. 131052-308T.",
-          },
-        },
-        required: ["hetu"],
-      },
-    },
-    {
-      name: "get_case",
-      description:
-        "After identification: returns the caller's own open case and the sentence to tell them, or says they have none. Takes no parameters.",
-      parameters: { type: "object", properties: {} },
-    },
-    {
-      name: "record_intake",
-      description:
-        "Record the caller's symptoms and smoking status once you have them. Returns the exact sentence to say back to the caller.",
-      parameters: z.toJSONSchema(Intake),
-    },
-  ]);
+  return Response.json(AGENT_TOOLS);
 }
 
 /**

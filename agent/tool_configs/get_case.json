@@ -1,0 +1,14 @@
+{
+    "description": "After identification: returns the caller's own open case and the sentence to tell them, or says they have none. Takes no parameters.",
+    "dynamic_variables": {
+        "dynamic_variable_placeholders": {}
+    },
+    "expects_response": true,
+    "name": "get_case",
+    "parameters": {
+        "type": "object",
+        "properties": {}
+    },
+    "response_timeout_secs": 30,
+    "type": "client"
+}

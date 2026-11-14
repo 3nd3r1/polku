@@ -1,0 +1,72 @@
+{
+    "description": "Record the caller's symptoms and smoking status once you have them. Returns the exact sentence to say back to the caller, or the questions still to ask.",
+    "dynamic_variables": {
+        "dynamic_variable_placeholders": {}
+    },
+    "expects_response": true,
+    "name": "record_intake",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "smoking": {
+                "type": "string",
+                "enum": [
+                    "current",
+                    "former",
+                    "never",
+                    "unknown"
+                ],
+                "description": "Smoking status. Use unknown if not asked or not answered."
+            },
+            "observations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "enum": [
+                                "HAEMOPTYSIS",
+                                "HAEMOPTYSIS_REPEATED",
+                                "COUGH_NEW",
+                                "COUGH_WORSENING",
+                                "DYSPNOEA_NEW",
+                                "CHEST_PAIN",
+                                "SHOULDER_PAIN",
+                                "HOARSENESS",
+                                "WEIGHT_LOSS_UNEXPLAINED",
+                                "HAEMOPTYSIS_MASSIVE",
+                                "DYSPNOEA_SEVERE",
+                                "CHEST_PAIN_ACUTE_SEVERE"
+                            ],
+                            "description": "Symptom code. HAEMOPTYSIS_REPEATED = blood in sputum more than once. Use HAEMOPTYSIS_MASSIVE, DYSPNOEA_SEVERE or CHEST_PAIN_ACUTE_SEVERE only for heavy bleeding, breathlessness at rest right now, or sudden severe chest pain."
+                        },
+                        "durationDays": {
+                            "description": "How long the symptom has lasted, in days. Omit if the caller did not say.",
+                            "type": "integer"
+                        },
+                        "quote": {
+                            "type": "string",
+                            "description": "The caller's own words for this symptom, verbatim."
+                        },
+                        "knownCause": {
+                            "description": "A cause the caller gave for this symptom, e.g. 'fell skiing'. Omit if none.",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "code",
+                        "quote"
+                    ]
+                },
+                "description": "One entry per symptom the caller described."
+            }
+        },
+        "required": [
+            "smoking",
+            "observations"
+        ]
+    },
+    "response_timeout_secs": 30,
+    "type": "client"
+}
