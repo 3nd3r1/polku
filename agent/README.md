@@ -23,7 +23,7 @@ npm run agent:push        # sync.ts writes agent_configs/ and tool_configs/, the
 
 `agents.json` and `tools.json` hold the ElevenLabs ids. Put the agent id in `.env.local` as `NEXT_PUBLIC_ELEVENLABS_AGENT_ID`.
 
-Test from the Screening page (**Call from this browser**), not the ElevenLabs test window: the tools are client tools, so only our page can run them.
+Test from the Screening page (**Call the line**), not the ElevenLabs test window: the tools are client tools, so only our page can run them.
 
 The Screening page runs the tools during a browser call. Each one only forwards to the server and returns `sayThis` (or the refusal) to the agent:
 

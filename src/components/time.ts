@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { shortDayTime } from "@/ontology/labels";
 
 const subscribeSeconds = (tick: () => void) => {
   const t = setInterval(tick, 1000);
@@ -24,8 +25,27 @@ export function formatSpan(ms: number) {
   return `${d}d ${hms}`;
 }
 
-export const clockTime = (iso: string, seconds = false) =>
-  new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", ...(seconds && { second: "2-digit" }) });
+/** "2d 4h", "5h 12m", "12m" */
+export function shortSpan(ms: number) {
+  const m = Math.floor(Math.abs(ms) / 60000);
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m % 60}m`;
+  return `${m % 60}m`;
+}
 
-export const dayAndTime = (iso: string) =>
-  new Date(iso).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+export const clockTime = (iso: string, seconds = false) =>
+  new Date(iso).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/Helsinki",
+    ...(seconds && { second: "2-digit" }),
+  });
+
+/** "Mon 16.11 14:04" */
+export const when = (iso: string) => shortDayTime(new Date(iso));
+
+/** "Mon 16.11" */
+export const day = (iso: string) => when(iso).slice(0, -6);

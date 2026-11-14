@@ -6,6 +6,7 @@
 import { sql } from "drizzle-orm";
 import { evaluate } from "../ontology/engine";
 import type { Intake } from "../ontology/schema";
+import { STAFF_ONLY_STEPS } from "../ontology/labels";
 import { lung } from "../pathways/lung";
 import { recommendSlot } from "../sim/capacity";
 import { ageOf, type Person, syntheticPeople } from "../sim/people";
@@ -121,7 +122,8 @@ export async function resetDemo() {
         if (slot && s.plan === "booked") {
           scheduledAt = new Date(slot.at);
           unit = slot.unit;
-        } else if (slot) {
+        } else if (slot && !STAFF_ONLY_STEPS.includes(step.id)) {
+          // Staff-only steps are booked by staff, never offered to the patient.
           offeredAt = new Date(now - (s.plan === "offered" ? 6 : 30) * 60 * 60 * 1000);
           offeredSlot = { at: slot.at, unit: slot.unit };
         }

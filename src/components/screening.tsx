@@ -3,13 +3,12 @@
 import { ConversationProvider, useConversation, useConversationClientTool } from "@elevenlabs/react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatDuration, SMOKING_LABEL, SYMPTOM_LABEL } from "@/ontology/labels";
+import { STEP_LABEL } from "@/ontology/labels";
 import type { Intake } from "@/ontology/schema";
 import { lung } from "@/pathways/lung";
-import { maskHetu } from "@/ontology/hetu";
 import { ageOf } from "@/sim/people";
-import type { CallView } from "@/server/calls";
-import { clockTime, dayAndTime } from "./time";
+import type { AccessEntry, CallView } from "@/server/calls";
+import { clockTime, formatSpan, useNow, when } from "./time";
 
 const AGENT_ID = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
 
@@ -221,19 +220,18 @@ function ScreeningInner() {
 
   return (
     <div className="flex min-h-0 flex-1">
-      <aside className="flex w-80 shrink-0 flex-col border-r border-line">
+      <aside className="flex w-72 shrink-0 flex-col border-r border-line">
         <div className="border-b border-line p-5">
-          <p className="label">Demo</p>
           {AGENT_ID && (
             <button
               onClick={live ? () => conversation.endSession() : startVoiceCall}
-              className={`mt-3 h-11 w-full text-sm font-medium ${live ? "bg-alert text-black" : "bg-fg text-black hover:bg-white"}`}
+              className={`h-11 w-full text-sm ${live ? "bg-alert text-black" : "bg-fg text-black hover:bg-white"}`}
             >
-              {live ? "Hang up" : "Call from this browser"}
+              {live ? "Hang up" : "Call the line"}
             </button>
           )}
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            <span className="text-dim">Simulate:</span>
+          <p className="label mt-4">Play a call</p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {SAMPLES.map((s) => (
               <button key={s.label} onClick={() => simulateCall(s, setSelectedId)} className="text-muted hover:text-fg">
                 {s.label}
@@ -241,229 +239,225 @@ function ScreeningInner() {
             ))}
           </div>
         </div>
-        <p className="label border-b border-line px-5 py-3">Incoming calls · {calls?.length ?? 0}</p>
+        <p className="label flex h-11 shrink-0 items-center border-b border-line px-5">Calls</p>
         <div className="flex-1 overflow-y-auto">
-          {calls?.length === 0 && <p className="p-5 text-sm text-muted">No calls yet.</p>}
-          {calls?.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedId(c.id)}
-              className={`block w-full border-b border-line px-5 py-4 text-left ${
-                selected?.id === c.id ? "bg-raised" : "hover:bg-panel"
-              }`}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm">{c.person?.name ?? "Unknown caller"}</span>
-                <span className="text-xs text-dim">{clockTime(c.startedAt)}</span>
-              </div>
-              <CallState c={c} />
-            </button>
-          ))}
+          {calls?.length === 0 && <p className="p-5 text-sm text-dim">No calls yet.</p>}
+          {calls?.map((c) => {
+            const [text, tone] = callState(c);
+            return (
+              <button
+                key={c.id}
+                onClick={() => setSelectedId(c.id)}
+                className={`block w-full border-b border-line px-5 py-3 text-left ${
+                  selected?.id === c.id ? "bg-raised" : "hover:bg-panel"
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm">{c.person?.name ?? "Unknown caller"}</span>
+                  <span className="font-mono text-xs text-dim">{clockTime(c.startedAt)}</span>
+                </div>
+                <p className={`mt-0.5 text-xs ${tone}`}>{text}</p>
+              </button>
+            );
+          })}
         </div>
+        <p className="label border-t border-line px-5 py-3">Synthetic people</p>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto">{selected && <CallDetail c={selected} />}</main>
+      {selected ? (
+        <main className="grid min-w-0 flex-1 grid-cols-1 overflow-y-auto xl:grid-cols-3 xl:overflow-hidden">
+          <Conversation c={selected} />
+          <AgentSees c={selected} />
+          <Result c={selected} />
+        </main>
+      ) : (
+        <main className="flex flex-1 items-center justify-center text-sm text-dim">Call the line or play a call.</main>
+      )}
     </div>
   );
 }
 
-function CallState({ c }: { c: CallView }) {
-  const refused = c.access.some((e) => e.verdict === "refused");
-  const existing = c.case && c.case.callId !== c.id;
-  const [text, tone] =
-    c.outcome === "call_112"
-      ? ["Told to call 112", "text-alert"]
-      : c.outcome && existing
-        ? ["Added to open case", "text-ok"]
-        : c.outcome === "fast_track"
-          ? ["Nurse callback booked", "text-ok"]
-          : c.outcome === "see_gp"
-            ? ["Advised: see GP", "text-info"]
-            : c.outcome === "no_match"
-              ? ["No criteria matched", "text-muted"]
-              : c.status === "verifying"
-                ? ["Identifying…", "text-warn"]
-                : !c.person && refused
-                  ? ["Not identified · access refused", "text-alert"]
-                  : !c.person
-                    ? [c.status === "ended" ? "Ended" : "Connected", "text-muted"]
-                    : existing
-                      ? ["Case status given", "text-ok"]
-                      : c.status === "ended"
-                        ? ["Ended", "text-muted"]
-                        : ["Collecting symptoms…", "text-warn"];
-  return <p className={`mt-1 text-xs ${tone}`}>{text}</p>;
+function callState(c: CallView): [string, string] {
+  const existing = c.case !== null && c.case.callId !== c.id;
+  if (c.outcome === "call_112") return ["Call 112", "text-alert"];
+  if (c.outcome && existing) return ["Added to open case", "text-ok"];
+  if (c.outcome === "fast_track") return ["Nurse callback promised", "text-ok"];
+  if (c.outcome === "see_gp") return ["See a GP", "text-muted"];
+  if (c.outcome === "no_match") return ["No fast track", "text-muted"];
+  if (c.status === "verifying") return ["Identifying", "text-warn"];
+  if (!c.person && c.access.some((e) => e.verdict === "refused")) return ["Refused", "text-alert"];
+  if (existing) return ["Told case status", "text-ok"];
+  if (c.status === "ended") return ["Ended", "text-dim"];
+  return ["On the line", "text-warn"];
 }
 
-/** Every tool call the agent made, as the server decided it. */
-function AccessLog({ c }: { c: CallView }) {
+function Column({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <p className="label">Agent data access · enforced by the server, not the prompt</p>
-      {c.access.length === 0 && <p className="mt-3 text-sm text-dim">No tool calls yet. The agent knows nothing about the caller.</p>}
-      <ol className="mt-3 flex flex-col gap-1.5 font-mono text-xs">
-        {c.access.map((e, i) => (
-          <li key={i} className="flex gap-3">
-            <span className="text-dim">{clockTime(e.at, true)}</span>
-            <span className={`w-16 shrink-0 ${(e.verdict !== "refused") ? "text-ok" : "text-alert"}`}>{(e.verdict !== "refused") ? "allowed" : "refused"}</span>
-            <span className="w-28 shrink-0 text-muted">{e.tool}</span>
-            <span className={(e.verdict !== "refused") ? "" : "text-alert"}>{e.detail}</span>
-          </li>
-        ))}
-      </ol>
+    <section className="flex min-h-0 flex-col border-b border-line xl:border-b-0 xl:border-l xl:first:border-l-0">
+      <p className="label flex h-11 shrink-0 items-center border-b border-line px-5">{title}</p>
+      {children}
     </section>
   );
 }
 
-function CallDetail({ c }: { c: CallView }) {
-  const k = c.case;
-  const existing = k !== null && k.callId !== c.id;
-  const running = k?.clocks.find((x) => !x.stoppedAt);
-  const runningStep = running && lung.steps.find((x) => x.id === running.stepId);
-  const caseRead = c.access.some((e) => e.tool === "get_case" && (e.verdict !== "refused"));
-  const criterion = k && lung.criteria.find((x) => x.id === k.matches[0]?.criterionId);
-  const source = criterion && lung.sources.find((s) => s.id === criterion.sourceId);
-  const callback = k?.clocks.find((x) => x.stepId === "callback");
-
+function Conversation({ c }: { c: CallView }) {
+  const end = useRef<HTMLLIElement>(null);
+  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [c.transcript.length]);
   return (
-    <div className="flex flex-col gap-8 px-8 py-10">
-      <header>
-        <p className="label">Call {clockTime(c.startedAt)}</p>
-        <h1 className="mt-2 text-3xl font-light">{c.person?.name ?? "Unknown caller"}</h1>
-      </header>
-
-      <div className="grid gap-10 xl:grid-cols-2">
-        <section>
-          <p className="label">Conversation</p>
-          {c.transcript.length === 0 && <p className="mt-3 text-sm text-dim">Ringing…</p>}
-          <ol className="mt-3 flex flex-col gap-3">
-            {c.transcript.map((t, i) => (
-              <li
-                key={i}
-                className={`max-w-[85%] px-4 py-2.5 text-sm ${t.role === "caller" ? "self-end bg-raised" : "border border-line text-muted"}`}
-              >
-                {t.text}
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section>
-          <p className="label">AI screening</p>
-          <ol className="mt-3 border-l border-line">
-            <Stage title="Strong identification" done={c.person !== null} active={c.status === "verifying"}>
-              {c.person ? (
-                <>
-                  <p>
-                    {maskHetu(c.person.hetu)} · {ageOf(c.person)} y · {c.person.county}
-                  </p>
-                  <p className="text-xs text-dim">Identity code + Mobile ID (simulated) · synthetic person</p>
-                </>
-              ) : c.status === "verifying" ? (
-                <p className="text-warn">Mobile ID request sent to the registered phone…</p>
-              ) : c.access.some((e) => e.verdict === "refused") ? (
-                <p className="text-alert">Not identified. Nothing about any person was released.</p>
-              ) : null}
-            </Stage>
-
-            <Stage title="Case on file" done={caseRead}>
-              {caseRead &&
-                (existing && runningStep && running ? (
-                  <>
-                    <p>
-                      {runningStep.name}, due {dayAndTime(running.dueAt)}
-                    </p>
-                    {running.scheduledAt && (
-                      <p className="text-sm text-muted">
-                        Booked {dayAndTime(running.scheduledAt)}
-                        {running.unit && ` · ${running.unit}`}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-muted">No open case</p>
-                ))}
-            </Stage>
-
-            <Stage title="Symptoms" done={c.outcome !== null} active={c.status === "verified" && !existing}>
-              {k && c.outcome ? (
-                <ul className="flex flex-col gap-2">
-                  {k.intake.observations.map((o, i) => (
-                    <li key={i}>
-                      <p>
-                        {SYMPTOM_LABEL[o.code]}
-                        {o.durationDays !== undefined && (
-                          <span className="text-muted">, {formatDuration(o.durationDays)}</span>
-                        )}
-                      </p>
-                      <p className="text-sm text-muted">&ldquo;{o.quote}&rdquo;</p>
-                    </li>
-                  ))}
-                  <li className="text-muted">{SMOKING_LABEL[k.intake.smoking]}</li>
-                </ul>
-              ) : c.status === "verified" && !existing ? (
-                <p className="text-warn">Listening…</p>
-              ) : null}
-            </Stage>
-
-            <Stage title="Criteria check" done={c.outcome !== null}>
-              {k &&
-                c.outcome &&
-                (criterion ? (
-                  <>
-                    <p>{criterion.gloss}</p>
-                    {source && <p className="text-xs text-dim">{source.spokenName.replace(/^the /, "Source: ")}</p>}
-                  </>
-                ) : (
-                  <p className="text-muted">No pathway criterion matched.</p>
-                ))}
-            </Stage>
-
-            <Stage title="Outcome" done={c.outcome !== null} last>
-              {existing && c.outcome && c.outcome !== "call_112" && (
-                <p className="text-lg">Added to the open case for the nurse</p>
-              )}
-              {!existing && c.outcome === "fast_track" && callback && (
-                <div className="flex flex-wrap items-center gap-4">
-                  <p className="text-lg">Nurse callback by {dayAndTime(callback.dueAt)}</p>
-                  <Link href="/nurse" className="text-sm text-muted hover:text-fg">
-                    Open in nurse view →
-                  </Link>
-                </div>
-              )}
-              {c.outcome === "call_112" && <p className="text-lg text-alert">Told to hang up and call 112</p>}
-              {c.outcome === "see_gp" && <p className="text-lg">Advised to book a GP appointment</p>}
-              {c.outcome === "no_match" && (
-                <p className="text-lg text-muted">No fast track. Told to contact their health centre if worried.</p>
-              )}
-            </Stage>
-          </ol>
-        </section>
-      </div>
-      <AccessLog c={c} />
-    </div>
+    <Column title="Call">
+      <ol className="flex flex-1 flex-col gap-3 overflow-y-auto p-5">
+        {c.transcript.length === 0 && <li className="text-sm text-dim">Ringing</li>}
+        {c.transcript.map((t, i) => (
+          <li
+            key={i}
+            className={`max-w-[85%] px-4 py-2.5 text-sm ${t.role === "caller" ? "self-end bg-raised" : "border border-line text-muted"}`}
+          >
+            {t.text}
+          </li>
+        ))}
+        <li ref={end} aria-hidden />
+      </ol>
+    </Column>
   );
 }
 
-function Stage({
-  title,
-  done,
-  active,
-  last,
-  children,
-}: {
-  title: string;
-  done: boolean;
-  active?: boolean;
-  last?: boolean;
-  children?: React.ReactNode;
-}) {
-  const marker = done ? "bg-ok" : active ? "bg-warn animate-pulse" : "bg-line-strong";
+const TOOL_LABEL: Record<string, string> = {
+  verify_identity: "Identify caller",
+  get_case: "Read case",
+  record_intake: "Record symptoms",
+};
+const VERDICT_COLOR: Record<AccessEntry["verdict"], string> = { allowed: "bg-ok", refused: "bg-alert", ask: "bg-warn" };
+
+/** Every tool call the agent made, and what the server let it see. */
+function AgentSees({ c }: { c: CallView }) {
+  const p = c.person;
   return (
-    <li className={`relative pl-8 ${last ? "" : "pb-8"}`}>
-      <span className={`absolute top-1.5 -left-[5px] h-2.5 w-2.5 ${marker}`} aria-hidden />
-      <p className={`label ${done || active ? "text-fg" : ""}`}>{title}</p>
-      <div className="mt-2">{children}</div>
-    </li>
+    <Column title="What the agent can see">
+      <div className="flex-1 overflow-y-auto p-5">
+        <p className="text-xl font-light">
+          {p ? (
+            <>
+              {p.name.split(" ")[0]}, {ageOf(p)}, {p.county}. <span className="text-muted">Own record only.</span>
+            </>
+          ) : c.status === "verifying" ? (
+            "Waiting for Mobile ID."
+          ) : (
+            <>
+              Nothing. <span className="text-muted">The caller is not identified.</span>
+            </>
+          )}
+        </p>
+        <p className="mt-2 text-xs text-dim">Decided by the server on every request, not by the prompt.</p>
+
+        <ol className="mt-6 border-t border-line">
+          {c.access.map((e, i) => (
+            <li key={i} className="flex gap-3 border-b border-line py-3">
+              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 ${VERDICT_COLOR[e.verdict]}`} aria-hidden />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm">{TOOL_LABEL[e.tool] ?? e.tool}</span>
+                  <span className="font-mono text-xs text-dim">{clockTime(e.at, true)}</span>
+                </div>
+                <p className={`mt-0.5 text-sm ${e.verdict === "refused" ? "text-alert" : "text-muted"}`}>{e.detail}</p>
+              </div>
+            </li>
+          ))}
+          {c.status === "verifying" && (
+            <li className="flex gap-3 border-b border-line py-3">
+              <span className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-pulse bg-warn" aria-hidden />
+              <div>
+                <p className="text-sm">Identify caller</p>
+                <p className="mt-0.5 text-sm text-muted">Mobile ID request sent to the registered phone</p>
+              </div>
+            </li>
+          )}
+        </ol>
+      </div>
+    </Column>
+  );
+}
+
+function Result({ c }: { c: CallView }) {
+  const now = useNow();
+  const k = c.case;
+  const existing = k !== null && k.callId !== c.id;
+  const running = k?.clocks.find((x) => !x.stoppedAt);
+  const callback = k?.clocks.find((x) => x.stepId === "callback");
+  const criterion = k && lung.criteria.find((x) => x.id === k.matches[0]?.criterionId);
+  const source = criterion && lung.sources.find((s) => s.id === criterion.sourceId);
+
+  let body: React.ReactNode = <p className="text-sm text-dim">Nothing decided yet.</p>;
+  if (c.outcome === "call_112") {
+    body = (
+      <>
+        <p className="text-4xl font-light text-alert">Call 112</p>
+        <p className="mt-3 text-muted">Emergency symptom. The caller was told to hang up and call 112.</p>
+      </>
+    );
+  } else if (k && existing && running) {
+    body = (
+      <>
+        <p className="label">{c.outcome ? "Added to open case" : "Open case"}</p>
+        <p className="mt-3 text-3xl font-light">
+          {STEP_LABEL[running.stepId]} {running.scheduledAt ? when(running.scheduledAt) : `by ${when(running.dueAt)}`}
+        </p>
+        {running.unit && <p className="mt-2 text-muted">{running.unit}</p>}
+        <NurseLink id={k.id} />
+      </>
+    );
+  } else if (k && c.outcome === "fast_track" && callback) {
+    const left = now === null ? null : new Date(callback.dueAt).getTime() - now;
+    body = (
+      <>
+        <p className="label">Promise</p>
+        <p className="mt-3 text-3xl font-light">Nurse calls by {when(callback.dueAt)}</p>
+        {left !== null && !callback.stoppedAt && (
+          <p className={`mt-3 font-mono text-lg tabular-nums ${left < 0 ? "text-alert" : "text-ok"}`}>
+            {formatSpan(left)} {left < 0 ? "over" : "left"}
+          </p>
+        )}
+        <NurseLink id={k.id} />
+      </>
+    );
+  } else if (c.outcome === "see_gp") {
+    body = (
+      <>
+        <p className="text-3xl font-light">See a GP</p>
+        <p className="mt-3 text-muted">No fast track. The caller was told to book a GP appointment.</p>
+      </>
+    );
+  } else if (c.outcome === "no_match") {
+    body = (
+      <>
+        <p className="text-3xl font-light">No fast track</p>
+        <p className="mt-3 text-muted">The caller was told to contact their health centre if worried.</p>
+      </>
+    );
+  }
+
+  return (
+    <Column title="Result">
+      <div className="flex flex-1 flex-col overflow-y-auto p-5">
+        <div className="flex-1">{body}</div>
+        {c.outcome && criterion && (
+          <div className="mt-8 border-t border-line pt-4 text-sm">
+            <p>{criterion.gloss}</p>
+            {source && (
+              <a href={source.url} target="_blank" rel="noreferrer" className="mt-1 block text-info hover:underline">
+                {source.spokenName.replace(/^the /, "")}
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    </Column>
+  );
+}
+
+function NurseLink({ id }: { id: string }) {
+  return (
+    <Link href={`/nurse?case=${id}`} className="mt-8 inline-block text-sm text-muted hover:text-fg">
+      Open in nurse view →
+    </Link>
   );
 }

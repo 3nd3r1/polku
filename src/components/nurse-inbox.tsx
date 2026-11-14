@@ -1,46 +1,54 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { formatDuration, SMOKING_LABEL, SYMPTOM_LABEL } from "@/ontology/labels";
+import { SMOKING_LABEL, STAFF_ONLY_STEPS, STEP_LABEL, SYMPTOM_LABEL, formatDuration } from "@/ontology/labels";
 import { lung } from "@/pathways/lung";
-import { type Slot, slotsFor } from "@/sim/capacity";
 import type { CaseView, ClockView } from "@/server/cases";
-import { clockTime, dayAndTime, formatSpan, useNow } from "./time";
+import { day, formatSpan, shortSpan, useNow, when } from "./time";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const NO_REPLY_MS = 24 * HOUR_MS;
 
-/** Nurse work only: fast-track cases. 112 and advice-only calls never reach the inbox. */
-const isNurseCase = (c: CaseView) => c.outcome === "fast_track" && c.status !== "dismissed";
-const openClock = (c: CaseView) => c.clocks.find((k) => k.stoppedAt === null);
-const step = (id: string) => lung.steps.find((s) => s.id === id)!;
-const firstName = (c: CaseView) => c.person?.name.split(" ")[0] ?? "caller";
-const facts = (c: CaseView) =>
-  [c.intake.age !== undefined ? `${c.intake.age} y` : "age unknown", c.county, SMOKING_LABEL[c.intake.smoking]]
-    .filter(Boolean)
-    .join(" · ");
-const fullDate = (iso: string) =>
-  new Date(iso).toLocaleString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+/** Nurse work only: fast-track cases. 112 and advice-only calls never reach this list. */
+const isNurseCase = (c: CaseView) => c.outcome === "fast_track" && (c.status === "pending_review" || c.status === "active");
+const running = (c: CaseView) => c.clocks.find((k) => k.stoppedAt === null);
+const firstName = (c: CaseView) => c.person?.name.split(" ")[0] ?? "the caller";
 
-/** Whole days a booked time lands after the step's deadline (0 or less = on time). */
-const daysLate = (k: ClockView, at: string) => Math.ceil((new Date(at).getTime() - new Date(k.dueAt).getTime()) / DAY_MS);
+type Group = "call" | "schedule" | "waiting" | "booked";
+const GROUPS: { id: Group; title: string }[] = [
+  { id: "call", title: "Call back" },
+  { id: "schedule", title: "Schedule" },
+  { id: "waiting", title: "Waiting for reply" },
+  { id: "booked", title: "Booked" },
+];
 
-async function caseAction(id: string, body: object) {
-  await fetch(`/api/cases/${id}`, {
+function groupOf(c: CaseView): Group {
+  const k = running(c);
+  if (c.status === "pending_review" || !k) return "call";
+  if (k.scheduledAt) return "booked";
+  if (k.offeredAt) return "waiting";
+  return "schedule";
+}
+
+/** When the list sorts this case: the appointment once booked, otherwise the step's due time. */
+const sortKey = (c: CaseView) => {
+  const k = running(c);
+  return k ? new Date(k.scheduledAt ?? k.dueAt).getTime() : 0;
+};
+
+async function act(id: string, action: string) {
+  const res = await fetch(`/api/cases/${id}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ action }),
   });
+  if (!res.ok) console.error("Case action failed", action, (await res.json().catch(() => null))?.error);
 }
 
 export function NurseInbox() {
   const [cases, setCases] = useState<CaseView[] | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(useSearchParams().get("case"));
   const now = useNow();
 
   const refresh = useCallback(async () => {
@@ -54,39 +62,31 @@ export function NurseInbox() {
     return () => events.close();
   }, [refresh]);
 
-  const selected = cases?.find((c) => c.id === selectedId) ?? cases?.[0];
+  const sorted = [...(cases ?? [])].sort((a, b) => sortKey(a) - sortKey(b));
+  const selected = sorted.find((c) => c.id === selectedId) ?? sorted[0];
 
   return (
     <div className="flex min-h-0 flex-1">
-      <aside className="w-80 shrink-0 overflow-y-auto border-r border-line">
-        <p className="label border-b border-line px-5 py-3">Patients · {cases?.length ?? 0}</p>
-        {cases?.length === 0 && <p className="p-5 text-sm text-muted">No patients waiting.</p>}
-        {cases?.map((c) => {
-          const k = openClock(c);
-          const left = k && now !== null ? new Date(k.dueAt).getTime() - now : null;
-          return (
-            <button
-              key={c.id}
-              onClick={() => setSelectedId(c.id)}
-              className={`block w-full border-b border-line px-5 py-4 text-left ${
-                selected?.id === c.id ? "bg-raised" : "hover:bg-panel"
-              }`}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm">{c.person?.name ?? "Unverified caller"}</span>
-                <span className="text-xs text-dim">{clockTime(c.createdAt)}</span>
-              </div>
-              <div className="mt-1 flex items-baseline justify-between gap-2 text-xs">
-                <span className="text-muted">{k ? step(k.stepId).name : "Pathway complete"}</span>
-                {left !== null && (
-                  <span className={`font-mono ${left < 0 ? "text-alert" : "text-muted"}`}>
-                    {left < 0 ? "overdue" : formatSpan(left)}
-                  </span>
-                )}
-              </div>
-            </button>
-          );
-        })}
+      <aside className="flex w-80 shrink-0 flex-col border-r border-line">
+        <div className="flex-1 overflow-y-auto">
+          {cases?.length === 0 && <p className="p-5 text-sm text-dim">No patients waiting.</p>}
+          {GROUPS.map((g) => {
+            const rows = sorted.filter((c) => groupOf(c) === g.id);
+            if (rows.length === 0) return null;
+            return (
+              <section key={g.id}>
+                <p className="label flex h-11 items-center justify-between border-b border-line px-5">
+                  <span>{g.title}</span>
+                  <span className="text-dim">{rows.length}</span>
+                </p>
+                {rows.map((c) => (
+                  <Row key={c.id} c={c} now={now} selected={c.id === selected?.id} onClick={() => setSelectedId(c.id)} />
+                ))}
+              </section>
+            );
+          })}
+        </div>
+        <p className="label border-t border-line px-5 py-3">Synthetic patients and slots</p>
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">
@@ -96,262 +96,247 @@ export function NurseInbox() {
   );
 }
 
-function CaseDetail({ c, now }: { c: CaseView; now: number | null }) {
-  const criterion = lung.criteria.find((k) => k.id === c.matches[0]?.criterionId);
-  const k = openClock(c);
+function Row({ c, now, selected, onClick }: { c: CaseView; now: number | null; selected: boolean; onClick: () => void }) {
+  const k = running(c);
+  if (!k) return null;
+  const left = now === null ? null : new Date(k.dueAt).getTime() - now;
+  const noReply = k.offeredAt && !k.scheduledAt && now !== null && now - new Date(k.offeredAt).getTime() > NO_REPLY_MS;
+
+  let right: React.ReactNode = null;
+  if (k.scheduledAt) right = <span className="text-muted">{when(k.scheduledAt)}</span>;
+  else if (noReply) right = <span className="text-warn">No reply</span>;
+  else if (left !== null)
+    right = <span className={left < 0 ? "text-alert" : left < HOUR_MS * 12 ? "text-warn" : "text-muted"}>{left < 0 ? `${shortSpan(left)} over` : shortSpan(left)}</span>;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-10 px-8 py-10">
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center justify-between gap-3 border-b border-line px-5 py-3 text-left ${
+        selected ? "bg-raised" : "hover:bg-panel"
+      }`}
+    >
+      <div className="min-w-0">
+        <p className="truncate text-sm">{c.person?.name ?? "Unknown"}</p>
+        <p className="text-xs text-muted">{STEP_LABEL[k.stepId]}</p>
+      </div>
+      <span className="shrink-0 font-mono text-xs tabular-nums">{right}</span>
+    </button>
+  );
+}
+
+function CaseDetail({ c, now }: { c: CaseView; now: number | null }) {
+  const p = c.person;
+  return (
+    <div className="flex max-w-3xl flex-col gap-10 px-8 py-10">
       <header>
-        <h1 className="text-3xl font-light">{c.person?.name ?? "Unverified caller"}</h1>
-        <p className="mt-1 text-muted">{facts(c)}</p>
-        <p className="mt-1 text-sm text-dim">
-          Called {dayAndTime(c.createdAt)}
-          {c.person && ` · ${c.person.phone} · identity verified (simulated)`}
+        <h1 className="text-3xl font-light">{p?.name ?? "Unknown"}</h1>
+        <p className="mt-1 text-muted">
+          {[c.intake.age !== undefined && `${c.intake.age}`, c.county, SMOKING_LABEL[c.intake.smoking]].filter(Boolean).join(" · ")}
         </p>
       </header>
-
-      <NextAction c={c} clock={k} now={now} />
-
-      <section className="grid gap-8 md:grid-cols-2">
-        <div>
-          <h2 className="label">Caller said</h2>
-          <ul className="mt-3 flex flex-col gap-3">
-            {c.intake.observations.map((o, i) => (
-              <li key={i}>
-                <p>
-                  {SYMPTOM_LABEL[o.code]}
-                  {o.durationDays !== undefined && <span className="text-muted">, {formatDuration(o.durationDays)}</span>}
-                </p>
-                <p className="text-sm text-muted">&ldquo;{o.quote}&rdquo;</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-        {criterion && (
-          <div>
-            <h2 className="label">Why fast track</h2>
-            <p className="mt-3">{criterion.gloss}</p>
-            {c.notes && (
-              <>
-                <h2 className="label mt-6">Callback notes</h2>
-                <p className="mt-2 text-sm whitespace-pre-wrap text-muted">{c.notes}</p>
-              </>
-            )}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="label">Pathway</h2>
-        <ol className="mt-3 border-l border-line">
-          {lung.steps.map((s) => (
-            <Step
-              key={s.id}
-              name={s.name}
-              maxDays={s.maxDays}
-              clock={c.clocks.find((x) => x.stepId === s.id)}
-              now={now}
-            />
-          ))}
-        </ol>
-      </section>
+      <NextStep c={c} now={now} />
+      <Pathway c={c} now={now} />
     </div>
   );
 }
 
-/** The one thing the nurse should do now. */
-function NextAction({ c, clock, now }: { c: CaseView; clock?: ClockView; now: number | null }) {
-  if (c.status === "pending_review") return <Callback c={c} />;
-  if (c.status === "completed" || !clock) {
-    return <Panel title="Pathway complete">All steps are done.</Panel>;
-  }
-  const s = step(clock.stepId);
-  if (!clock.scheduledAt) return <Booking key={clock.stepId} c={c} clock={clock} />;
+/** The one thing to do now, with one button. */
+function NextStep({ c, now }: { c: CaseView; now: number | null }) {
+  const [busy, setBusy] = useState(false);
+  const k = running(c);
+  if (!k) return null;
+  const run = (action: string) => async () => {
+    setBusy(true);
+    await act(c.id, action);
+    setBusy(false);
+  };
+  const step = STEP_LABEL[k.stepId];
+  const name = firstName(c);
 
-  const late = daysLate(clock, clock.scheduledAt);
-  const happened = now !== null && new Date(clock.scheduledAt).getTime() <= now;
-  return (
-    <Panel title={`${s.name}: booked`}>
-      <p className="text-xl">{fullDate(clock.scheduledAt)}</p>
-      <p className="text-muted">{clock.unit}</p>
-      <p className={`mt-1 text-sm ${late > 0 ? "text-alert" : "text-ok"}`}>
-        {late > 0 ? `Misses the ${s.maxDays}-day target by ${late} days` : `Within the ${s.maxDays}-day target`}
-      </p>
-      <button
-        onClick={() => caseAction(c.id, { action: "advance" })}
-        className="mt-5 h-11 bg-fg px-5 text-sm text-black hover:bg-white"
-      >
-        {happened ? `Mark ${s.name.toLowerCase()} done` : "Mark done (demo: skip ahead)"}
-      </button>
-    </Panel>
-  );
-}
-
-function Callback({ c }: { c: CaseView }) {
-  const [phase, setPhase] = useState<"idle" | "dialing" | "connected">("idle");
-  const [confirmed, setConfirmed] = useState(false);
-  const [informed, setInformed] = useState(false);
-  const [notes, setNotes] = useState("");
-
-  function dial() {
-    setPhase("dialing");
-    setTimeout(() => setPhase("connected"), 1800);
-  }
-
-  if (phase === "idle") {
+  // 1. Call the patient back and decide.
+  if (c.status === "pending_review") {
+    const criterion = lung.criteria.find((x) => x.id === c.matches[0]?.criterionId);
     return (
-      <Panel title="Next: nurse callback">
-        <p className="text-muted">Confirm the symptoms with {firstName(c)} and decide on referral.</p>
-        <button onClick={dial} className="mt-5 h-11 bg-fg px-5 text-sm text-black hover:bg-white">
-          Call {firstName(c)} · {c.person?.phone ?? "number unknown"}
-        </button>
-      </Panel>
-    );
-  }
-  if (phase === "dialing") {
-    return (
-      <Panel title="Calling">
-        <p className="animate-pulse text-xl">Calling {c.person?.phone}…</p>
-        <p className="text-xs text-dim">Simulated call</p>
-      </Panel>
-    );
-  }
-  return (
-    <Panel title={`On call with ${firstName(c)} · simulated`}>
-      <div className="flex flex-col gap-3">
-        <Check checked disabled label="Identity verified with Mobile ID" />
-        <Check checked={confirmed} onChange={setConfirmed} label="Symptoms and duration confirmed with the caller" />
-        <Check checked={informed} onChange={setInformed} label="Caller told what happens next" />
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes"
-          rows={3}
-          className="mt-2 border border-line-strong bg-base p-3 text-sm outline-none focus:border-fg"
-        />
-      </div>
-      <div className="mt-5 flex gap-3">
-        <button
-          disabled={!confirmed || !informed}
-          onClick={() => caseAction(c.id, { action: "confirm", notes })}
-          className="h-11 bg-fg px-5 text-sm text-black hover:bg-white disabled:opacity-30"
-        >
-          Refer to imaging
-        </button>
-        <button
-          onClick={() => caseAction(c.id, { action: "dismiss", notes })}
-          className="h-11 border border-line-strong px-5 text-sm hover:bg-raised"
-        >
-          No referral
-        </button>
-      </div>
-    </Panel>
-  );
-}
-
-function Booking({ c, clock }: { c: CaseView; clock: ClockView }) {
-  const s = step(clock.stepId);
-  const slots: Slot[] = slotsFor(c.county, clock.stepId);
-  const [picked, setPicked] = useState<string | null>(null);
-
-  return (
-    <Panel title={`Next: book ${s.name.toLowerCase()}`}>
-      <p className="text-sm text-muted">
-        Target {s.maxDays} days, due {fullDate(clock.dueAt)}. Free slots at {slots[0]?.resource}, {slots[0]?.unit} (synthetic availability):
-      </p>
-      <ul className="mt-4 flex flex-col border-t border-line">
-        {slots.map((slot) => {
-          const late = daysLate(clock, slot.at);
-          return (
-            <li key={slot.id} className="border-b border-line">
-              <button
-                onClick={() => setPicked(slot.id)}
-                className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm ${
-                  picked === slot.id ? "bg-fg text-black" : "hover:bg-raised"
-                }`}
-              >
-                <span>{fullDate(slot.at)}</span>
-                <span className={picked === slot.id ? "" : late > 0 ? "text-alert" : "text-ok"}>
-                  {late > 0 ? `${late} days over target` : "within target"}
-                </span>
-              </button>
+      <Panel title="Now" due={k} now={now}>
+        <p className="text-2xl font-light">Call {name} back</p>
+        <p className="mt-1 font-mono text-muted">{c.person?.phone}</p>
+        <ul className="mt-5 flex flex-col gap-1 text-sm">
+          {c.intake.observations.map((o, i) => (
+            <li key={i}>
+              {SYMPTOM_LABEL[o.code]}
+              {o.durationDays !== undefined && <span className="text-muted">, {formatDuration(o.durationDays)}</span>}
             </li>
-          );
-        })}
-      </ul>
-      <button
-        disabled={!picked}
-        onClick={() => picked && caseAction(c.id, { action: "book", slotId: picked })}
-        className="mt-5 h-11 bg-fg px-5 text-sm text-black hover:bg-white disabled:opacity-30"
-      >
-        Book slot
-      </button>
+          ))}
+        </ul>
+        {criterion && <p className="mt-3 text-sm text-muted">Matched: {criterion.gloss}</p>}
+        <Buttons>
+          <Primary onClick={run("confirm")} busy={busy}>
+            Refer to CT
+          </Primary>
+          <Secondary onClick={run("dismiss")} busy={busy}>
+            Not needed
+          </Secondary>
+        </Buttons>
+      </Panel>
+    );
+  }
+
+  // 4. Booked: done when it has happened.
+  if (k.scheduledAt) {
+    return (
+      <Panel title="Now" due={k} now={now}>
+        <p className="text-2xl font-light">
+          {step} {when(k.scheduledAt)}
+        </p>
+        {k.unit && <p className="mt-1 text-muted">{k.unit}</p>}
+        <Buttons>
+          <Primary onClick={run("advance")} busy={busy}>
+            Mark done
+          </Primary>
+        </Buttons>
+      </Panel>
+    );
+  }
+
+  // 3. SMS sent, waiting for YES.
+  if (k.offeredAt && k.offeredSlot) {
+    const noReply = now !== null && now - new Date(k.offeredAt).getTime() > NO_REPLY_MS;
+    return (
+      <Panel title="Now" due={k} now={now}>
+        <p className="text-2xl font-light">{noReply ? `No reply from ${name}` : `Waiting for ${name}`}</p>
+        <Sms at={k.offeredAt} text={smsText(step, k.offeredSlot)} />
+        <Buttons>
+          {noReply && (
+            <Primary onClick={run("book")} busy={busy}>
+              Book it and call {name}
+            </Primary>
+          )}
+          {noReply ? (
+            <Secondary onClick={run("reply")} busy={busy}>
+              {name} replied YES
+            </Secondary>
+          ) : (
+            <Primary onClick={run("reply")} busy={busy}>
+              {name} replied YES
+            </Primary>
+          )}
+        </Buttons>
+        <p className="mt-3 text-xs text-dim">SMS simulated</p>
+      </Panel>
+    );
+  }
+
+  // 2. Pick the time: the system recommends one, the nurse sends it to the patient (or books staff-only steps).
+  const slot = c.recommended;
+  const staffOnly = STAFF_ONLY_STEPS.includes(k.stepId);
+  return (
+    <Panel title="Now" due={k} now={now}>
+      <p className="label">Recommended {step}</p>
+      {slot ? (
+        <>
+          <p className="mt-3 text-2xl font-light">{when(slot.at)}</p>
+          <p className="mt-1 text-muted">{slot.unit}</p>
+          <p className={`mt-1 text-sm ${slot.onTime ? "text-ok" : "text-warn"}`}>
+            {slot.onTime ? "Within the time limit" : "After the time limit. Earliest free slot."}
+          </p>
+          <Buttons>
+            {staffOnly ? (
+              <Primary onClick={run("book")} busy={busy}>
+                Book
+              </Primary>
+            ) : (
+              <Primary onClick={run("offer")} busy={busy}>
+                Propose to {name}
+              </Primary>
+            )}
+          </Buttons>
+        </>
+      ) : (
+        <p className="mt-3 text-muted">No free slot in the next weeks.</p>
+      )}
     </Panel>
   );
 }
 
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+const smsText = (step: string, slot: { at: string; unit: string }) =>
+  `Your ${step} time: ${when(slot.at)}, ${slot.unit}. Reply YES to confirm, or call us to change it.`;
+
+function Sms({ at, text }: { at: string; text: string }) {
   return (
-    <section className="border border-line-strong bg-panel p-6">
-      <h2 className="label text-fg">{title}</h2>
-      <div className="mt-3">{children}</div>
+    <div className="mt-5 max-w-md border border-line px-4 py-3">
+      <p className="label">SMS sent {when(at)}</p>
+      <p className="mt-2 text-sm">{text}</p>
+    </div>
+  );
+}
+
+function Panel({ title, due, now, children }: { title: string; due: ClockView; now: number | null; children: React.ReactNode }) {
+  const left = now === null ? null : new Date(due.dueAt).getTime() - now;
+  return (
+    <section className="border border-line bg-panel p-6">
+      <div className="mb-5 flex items-baseline justify-between gap-4">
+        <p className="label">{title}</p>
+        <p className="font-mono text-sm tabular-nums">
+          <span className="text-muted">Due {when(due.dueAt)} </span>
+          {left !== null && <span className={left < 0 ? "text-alert" : "text-ok"}>{formatSpan(left)} {left < 0 ? "over" : "left"}</span>}
+        </p>
+      </div>
+      {children}
     </section>
   );
 }
 
-function Check({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange?: (v: boolean) => void;
-}) {
+const Buttons = ({ children }: { children: React.ReactNode }) => <div className="mt-6 flex flex-wrap gap-3">{children}</div>;
+
+function Primary({ onClick, busy, children }: { onClick: () => void; busy: boolean; children: React.ReactNode }) {
   return (
-    <label className={`flex items-center gap-3 text-sm ${disabled ? "text-muted" : "cursor-pointer"}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange?.(e.target.checked)}
-        className="h-4 w-4 accent-[#e6e6e3]"
-      />
-      {label}
-    </label>
+    <button onClick={onClick} disabled={busy} className="h-11 bg-fg px-5 text-sm text-black hover:bg-white disabled:opacity-50">
+      {children}
+    </button>
   );
 }
 
-function Step({ name, maxDays, clock, now }: { name: string; maxDays: number; clock?: ClockView; now: number | null }) {
-  const running = clock && clock.stoppedAt === null;
-  const due = clock && new Date(clock.dueAt).getTime();
-  const took = clock?.stoppedAt ? new Date(clock.stoppedAt).getTime() - new Date(clock.startedAt).getTime() : null;
-  const late = clock && due !== undefined && (clock.stoppedAt ? new Date(clock.stoppedAt).getTime() : (now ?? 0)) > due;
-  const marker = !clock ? "bg-line-strong" : late ? "bg-alert" : running ? "bg-warn" : "bg-ok";
-
+function Secondary({ onClick, busy, children }: { onClick: () => void; busy: boolean; children: React.ReactNode }) {
   return (
-    <li className="relative py-3 pl-8">
-      <span className={`absolute top-5 -left-[5px] h-2.5 w-2.5 ${marker}`} aria-hidden />
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
-        <div className="min-w-48 flex-1">
-          <p className={clock ? "text-fg" : "text-dim"}>{name}</p>
-          <p className="text-xs text-dim">
-            {!clock && `Target ${maxDays} days`}
-            {running && `Target ${maxDays} days · due ${dayAndTime(clock.dueAt)}`}
-            {running && clock.scheduledAt && ` · booked ${fullDate(clock.scheduledAt)}`}
-            {took !== null && `Done in ${formatSpan(took)}${late ? " · late" : ""}`}
-          </p>
-        </div>
-        {running && now !== null && due !== undefined && (
-          <span className={`font-mono text-xl font-light tabular-nums ${due - now < 0 ? "text-alert" : "text-muted"}`}>
-            {due - now < 0 && "−"}
-            {formatSpan(due - now)}
-          </span>
-        )}
-      </div>
-    </li>
+    <button onClick={onClick} disabled={busy} className="h-11 border border-line-strong px-5 text-sm hover:bg-raised disabled:opacity-50">
+      {children}
+    </button>
+  );
+}
+
+/** The whole pathway as a schedule: what happened, what is booked, what is due. */
+function Pathway({ c, now }: { c: CaseView; now: number | null }) {
+  return (
+    <section>
+      <p className="label">Pathway</p>
+      <ol className="mt-3 border-t border-line">
+        {lung.steps.map((s) => {
+          const k = c.clocks.find((x) => x.stepId === s.id);
+          const kept = k?.stoppedAt ? k.stoppedAt <= k.dueAt : null;
+          const late = k && !k.stoppedAt && now !== null && new Date(k.dueAt).getTime() < now;
+          const marker = !k ? "bg-line-strong" : k.stoppedAt ? (kept ? "bg-ok" : "bg-alert") : late ? "bg-alert" : "bg-fg";
+          return (
+            <li key={s.id} className="flex h-11 items-center gap-4 border-b border-line text-sm">
+              <span className={`h-2.5 w-2.5 shrink-0 ${marker}`} aria-hidden />
+              <span className={`flex-1 ${k ? "" : "text-muted"}`}>{STEP_LABEL[s.id]}</span>
+              <span className="font-mono text-xs tabular-nums">
+                {!k ? (
+                  <span className="text-dim">within {s.maxDays} d</span>
+                ) : k.stoppedAt ? (
+                  <>
+                    <span className="text-muted">Done {day(k.stoppedAt)} </span>
+                    <span className={kept ? "text-ok" : "text-alert"}>{kept ? "kept" : "broken"}</span>
+                  </>
+                ) : k.scheduledAt ? (
+                  <span>Booked {when(k.scheduledAt)}</span>
+                ) : (
+                  <span className={late ? "text-alert" : ""}>Due {when(k.dueAt)}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

@@ -17,10 +17,11 @@ Status checked against the code Sat 14.11 09:00.
 | Voice agent (ElevenLabs) with `verify_identity` and `record_intake` tools | Done (browser call). Finnish untested. |
 | Cases, clocks and audit in Postgres, live updates over SSE | Done |
 | Nurse: confirm → step promises start | Done |
-| **Spoken deadline + countdown in seconds**, same time in voice and UI | Todo. `sayThis` still says "within 2 days". |
+| **Spoken deadline + countdown in seconds**, same time in voice and UI | Done |
+| **Handoff scheduler**: one recommended slot, nurse proposes it by SMS, simulated YES books it, no reply in 24 h is flagged | Done (one slot, no alternatives or preferences yet). SMS simulated. |
 | **Stage mode for Screening**: readable from 2 m, large live transcript, quote → symptom, the promise as the biggest text | Todo |
 | **Red-flag full-screen state**, labelled "engine rule, not model output" | Todo (one line of text today) |
-| **Scripted callers** in Simulate: Matti, Aino, red flag, Liisa (open case), Impostor | Done |
+| **Scripted callers** under "Play a call": Matti, Aino, red flag, Liisa (open case), Impostor | Done |
 | **Strong identification gate**: identity code + simulated Mobile ID, synthetic register in Postgres, access log on screen, tests | Done |
 | **Cockpit v1**: county tile grid, "today: not measured" (real) vs "with Polku" (synthetic, labelled), one headline sentence, one recommendation card, live bump from the call | Todo |
 | **Deploy** before the video is recorded | Done: https://polku.eros.ender.fi (Coolify, Aiven Postgres). Deploys on push (GitHub webhook). CI still todo. |
@@ -100,7 +101,7 @@ Facts checked Fri:
 
 ## Handoff scheduler
 
-The pitch is the gaps between steps (`story-and-demo.md`, "No gaps"). When a step ends, the next one must already be on its way to being booked. Today the nurse picks one of four slots from `slotsFor` (`src/sim/capacity.ts`) and books it. Target flow:
+The pitch is the gaps between steps (`story-and-demo.md`, "No gaps"). When a step ends, the next one must already be on its way to being booked. Built: `recommendSlot` (`src/sim/capacity.ts`) picks one slot, the nurse proposes it (`offer`), a simulated YES books it (`reply`), staff-only steps and no-reply cases are booked by staff (`book`). Not yet: alternatives, preferences, real SMS. Target flow:
 
 ```
 Step N stops (or nurse confirms the case)
