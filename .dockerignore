@@ -6,3 +6,4 @@ node_modules
 .env*
 agent/agent_configs
 agent/tool_configs
+video
