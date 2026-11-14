@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
 import { audit, calls, type CASE_STATUSES, cases, clocks, type CHANNELS } from "../db/schema";
-import { missingQuestions } from "../ontology/clarity";
+import { gapQuestion, gaps } from "../ontology/clarity";
 import { evaluate, sayThis, type Outcome } from "../ontology/engine";
 import { shortDayTime, spokenDayTime, STEP_LABEL, STEP_SPOKEN } from "../ontology/labels";
 import type { Intake } from "../ontology/schema";
@@ -11,6 +11,7 @@ import { ageOf, type Person } from "../sim/people";
 import { publishChange } from "./bus";
 import { ActionError } from "./errors";
 import { logAccess, refuse, requireIdentified } from "./identity";
+import { logRecord } from "./record";
 
 export { ActionError };
 
@@ -81,6 +82,7 @@ export async function getCase(callId: string) {
   if (clock?.offeredSlots?.length && !clock.scheduledAt) return offerTimes(callId, open.id, clock, clock.offeredSlots);
   const summary = clock ? caseStatusSentence(clock) : "Your case is open with the care team.";
   await db.update(calls).set({ caseId: open.id }).where(eq(calls.id, callId));
+  await logRecord(open.id, "call", "read", ["identity", "booking"], "Polku agent");
   await db.insert(audit).values({ caseId: open.id, action: "CallerCheckedStatus", actor: "system", data: { callId } });
   const where = clock
     ? `${STEP_LABEL[clock.stepId]}, ${clock.scheduledAt ? `booked ${shortDayTime(clock.scheduledAt)}` : `due ${shortDayTime(clock.dueAt)}`}`
@@ -99,6 +101,7 @@ async function offerTimes(callId: string, caseId: string, clock: Clock, slots: {
   const options = slots.map((s, i) => `option ${i + 1}, ${spokenDayTime(new Date(s.at))}`).join("; ");
   const summary = `The nurse has reviewed your case, and we have times for ${step} at ${slots[0].unit}: ${options}. Which one suits you?`;
   await db.update(calls).set({ caseId }).where(eq(calls.id, callId));
+  await logRecord(caseId, "call", "read", ["identity", "booking"], "Polku agent");
   await db.insert(audit).values({ caseId, action: "CallerHeardTimes", actor: "system", data: { callId } });
   await logAccess(callId, "get_case", "allowed", `Own record only: ${slots.length} ${STEP_LABEL[clock.stepId]} times to choose from`);
   publishChange();
@@ -120,8 +123,12 @@ export async function submitIntake(raw: Intake, channel: (typeof CHANNELS)[numbe
   }
   const intake: Intake = { ...raw, age: ageOf(person) };
 
+  // The packet fills on screen with every attempt, gaps included.
+  const missing = gaps(intake);
+  await db.update(calls).set({ draft: { intake, gaps: missing } }).where(eq(calls.id, callId));
+
   // The intake must be clear enough to evaluate. The agent asks, then calls again.
-  const questions = missingQuestions(intake);
+  const questions = missing.map(gapQuestion);
   if (questions.length > 0) {
     await logAccess(callId, "record_intake", "ask", `Not clear yet. ${questions.join(" ")}`);
     publishChange();
@@ -153,6 +160,7 @@ async function addToOpenCase(
       actor: "system",
       data: { callId, observations: intake.observations, outcome: evaluation.outcome },
     });
+    await logRecord(open.id, "call", "write", ["symptoms"], "Polku agent", tx);
     await tx.update(calls).set({ status: "screened", caseId: open.id, outcome: evaluation.outcome }).where(eq(calls.id, callId));
   });
   await logAccess(callId, "record_intake", "allowed", "Added to own open case");
@@ -201,6 +209,7 @@ async function openNewCase(
       })
       .returning({ id: cases.id });
     await tx.insert(audit).values({ caseId: row.id, action: "SubmitIntake", actor: "system", data: { channel } });
+    await logRecord(row.id, "call", "write", ["identity", "symptoms"], "Polku agent", tx);
     if (fastTrack) {
       callbackDueAt = await startClock(tx, row.id, "callback", now);
       await tx.insert(audit).values({

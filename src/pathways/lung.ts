@@ -15,6 +15,7 @@ export const lung = {
     {
       id: "SE-SVF",
       title: "RCC i samverkan, Standardiserat vårdförlopp lungcancer v1.4 (2024-11-05)",
+      name: "Swedish standardised lung cancer pathway v1.4",
       spokenName: "the Swedish standardised lung cancer pathway",
       url: "https://kunskapsbanken.cancercentrum.se/diagnoser/lungcancer/vardforlopp/",
       verification: "read",
@@ -22,6 +23,7 @@ export const lung = {
     {
       id: "DK-SYD",
       title: "sundhed.dk, Region Syddanmark GP guidance: Lungecancer (2021-04-21)",
+      name: "Region Southern Denmark GP guidance, lung cancer",
       spokenName: "Danish GP guidance from Region Southern Denmark",
       url: "https://www.sundhed.dk/sundhedsfaglig/information-til-praksis/syddanmark/almen-praksis/patientbehandling/patientforloeb/kraeftpakker/lungecancer/",
       verification: "read",
@@ -29,6 +31,7 @@ export const lung = {
     {
       id: "FI-PIRHA",
       title: "Pirkanmaan hyvinvointialue, Keuhkosyöpäpotilaan hoitopolku (2026-08-19)",
+      name: "Pirkanmaa lung cancer pathway",
       spokenName: "the Pirkanmaa wellbeing county lung cancer pathway",
       url: "https://www.pirha.fi/asiakkaalle/hoito-ja-palvelupolut/keuhkosyopapotilaan-hoitopolku",
       verification: "read",
@@ -36,6 +39,7 @@ export const lung = {
     {
       id: "POLKU",
       title: "Polku design choice (not from a published pathway)",
+      name: "Polku's own rules, not a published pathway",
       spokenName: "Polku's own safety rules",
       url: "https://github.com/3nd3r1/polku/blob/main/docs/build-plan.md#polkus-own-rules",
       verification: "design_choice",

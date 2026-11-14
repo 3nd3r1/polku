@@ -8,6 +8,7 @@ import { publishChange } from "./bus";
 import { type CaseView, toCaseViews } from "./cases";
 import { ActionError } from "./errors";
 import { logAccess, refuse, requireIdentified } from "./identity";
+import { logRecord } from "./record";
 
 /**
  * The nurse's scheduling: which patient to book first, the calendar of the
@@ -143,53 +144,75 @@ export async function calendarFor(caseId: string, now = new Date()) {
   return calendar(c, next.stepId, next.dueAt, await liveBookings(), now);
 }
 
-/**
- * ProposeTimes: the nurse confirms the case (if new) and proposes free times.
- * Polku then calls the patient, identifies them and lets them pick one.
- * Returns the id of that call.
- */
-export async function proposeTimes(caseId: string, times: string[], now = new Date()) {
-  if (times.length < 1 || times.length > 3) throw new ActionError("Propose one to three times", 422);
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Checks the times are free and returns the calendar they are on. */
+async function checkFree(caseId: string, times: string[], now: Date) {
   const cal = await calendarFor(caseId, now);
   if (!cal?.path) throw new ActionError("Nothing to book for this case", 409);
   const free = new Set(cal.days.flatMap((d) => d.sessions).filter((x) => x.state === "free" || x.state === "offered").map((x) => x.at));
   if (!times.every((t) => free.has(t))) throw new ActionError("A proposed time is no longer free", 409);
-  const unit = cal.path.facility;
+  return { cal, unit: cal.path.facility };
+}
+
+/**
+ * The nurse's decision on a new case stops the callback step and starts the
+ * next step's clock. Returns the running clock to book on.
+ */
+async function takeCase(tx: Tx, caseId: string, stepId: string, now: Date) {
+  const [c] = await tx.select().from(cases).where(eq(cases.id, caseId)).for("update");
+  if (!c) throw new ActionError("Case not found", 404);
+  const [open] = await tx
+    .select()
+    .from(clocks)
+    .where(and(eq(clocks.caseId, caseId), isNull(clocks.stoppedAt)));
+  if (!open) throw new ActionError("Case has no running step", 409);
+  if (c.status !== "pending_review") {
+    if (open.scheduledAt) throw new ActionError("Already booked", 409);
+    return open.id;
+  }
+  await tx.update(clocks).set({ stoppedAt: now }).where(eq(clocks.id, open.id));
+  const s = step(stepId);
+  const [k] = await tx
+    .insert(clocks)
+    .values({ caseId, stepId: s.id, startedAt: now, dueAt: new Date(now.getTime() + s.maxDays * DAY_MS) })
+    .returning({ id: clocks.id });
+  await tx.update(cases).set({ status: "active" }).where(eq(cases.id, caseId));
+  await tx.insert(audit).values({ caseId, action: "ConfirmCase", actor: "nurse", data: { stoppedStep: open.stepId, startedStep: s.id } });
+  return k.id;
+}
+
+/**
+ * ProposeTimes: the nurse accepts the proposed times. Polku then calls the
+ * patient, identifies them and lets them pick one. Returns the id of that call.
+ */
+export async function proposeTimes(caseId: string, times: string[], now = new Date()) {
+  if (times.length < 1 || times.length > 3) throw new ActionError("Propose one to three times", 422);
+  const { cal, unit } = await checkFree(caseId, times, now);
   const slots = [...times].sort().map((at) => ({ at, unit }));
 
   const callId = await db.transaction(async (tx) => {
-    const [c] = await tx.select().from(cases).where(eq(cases.id, caseId)).for("update");
-    if (!c) throw new ActionError("Case not found", 404);
-    const [open] = await tx
-      .select()
-      .from(clocks)
-      .where(and(eq(clocks.caseId, caseId), isNull(clocks.stoppedAt)));
-    if (!open) throw new ActionError("Case has no running step", 409);
-    let clockId = open.id;
-    if (c.status === "pending_review") {
-      // The nurse's review is the proposal: the contact step ends, the next step's clock starts.
-      await tx.update(clocks).set({ stoppedAt: now }).where(eq(clocks.id, open.id));
-      const s = step(cal.stepId);
-      const [k] = await tx
-        .insert(clocks)
-        .values({ caseId, stepId: s.id, startedAt: now, dueAt: new Date(now.getTime() + s.maxDays * DAY_MS) })
-        .returning({ id: clocks.id });
-      clockId = k.id;
-      await tx.update(cases).set({ status: "active" }).where(eq(cases.id, caseId));
-      await tx.insert(audit).values({
-        caseId,
-        action: "ConfirmCase",
-        actor: "nurse",
-        data: { stoppedStep: open.stepId, startedStep: s.id },
-      });
-    } else if (open.scheduledAt) throw new ActionError("Already booked", 409);
+    const clockId = await takeCase(tx, caseId, cal.stepId, now);
     await tx.update(clocks).set({ offeredAt: now, offeredSlots: slots }).where(eq(clocks.id, clockId));
     await tx.insert(audit).values({ caseId, action: "ProposeTimes", actor: "nurse", data: { stepId: cal.stepId, slots } });
+    await logRecord(caseId, "nurse", "write", ["booking"], "Nurse", tx);
     const [call] = await tx.insert(calls).values({ status: "ringing", purpose: "callback", caseId }).returning({ id: calls.id });
     return call.id;
   });
   publishChange();
   return callId;
+}
+
+/** BookByNurse: the nurse called the patient themselves and books the time they agreed. */
+export async function bookByNurse(caseId: string, at: string, now = new Date()) {
+  const { cal, unit } = await checkFree(caseId, [at], now);
+  await db.transaction(async (tx) => {
+    const clockId = await takeCase(tx, caseId, cal.stepId, now);
+    await tx.update(clocks).set({ scheduledAt: new Date(at), unit, offeredSlots: null }).where(eq(clocks.id, clockId));
+    await tx.insert(audit).values({ caseId, action: "NurseBooked", actor: "nurse", data: { stepId: cal.stepId, at, unit } });
+    await logRecord(caseId, "nurse", "write", ["booking"], "Nurse", tx);
+  });
+  publishChange();
 }
 
 /**
@@ -228,6 +251,7 @@ export async function bookTime(callId: string, option: number) {
   const at = new Date(slot.at);
   await db.update(clocks).set({ scheduledAt: at, unit: slot.unit, offeredSlots: null }).where(eq(clocks.id, k.id));
   await db.insert(audit).values({ caseId: c.id, action: "ConfirmSlot", actor: "patient", data: { callId, ...slot } });
+  await logRecord(c.id, "call", "write", ["booking"], "Polku agent");
   await logAccess(callId, tool, "allowed", `Booked ${STEP_LABEL[k.stepId]} ${shortDayTime(at)}`);
   publishChange();
   const summary = `You are booked for ${STEP_SPOKEN[k.stepId] ?? "your appointment"} on ${spokenDayTime(at)} at ${slot.unit}.`;

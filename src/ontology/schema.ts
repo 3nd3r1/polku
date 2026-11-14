@@ -62,6 +62,8 @@ export type Intake = z.infer<typeof Intake>;
 export type Source = {
   id: string;
   title: string;
+  /** Short name for the one source line on staff screens. */
+  name: string;
   /** How the voice agent names it out loud. */
   spokenName: string;
   url: string;

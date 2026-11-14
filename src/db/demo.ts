@@ -5,12 +5,13 @@
  */
 import { sql } from "drizzle-orm";
 import { evaluate } from "../ontology/engine";
+import { holderOf, MAY_OPEN } from "../ontology/record";
 import type { Intake } from "../ontology/schema";
 import { lung } from "../pathways/lung";
 import { ontologyPath, resourceCalendar, resourcesFor } from "../sim/capacity";
 import { ageOf, type Person, syntheticPeople } from "../sim/people";
 import { db } from "./index";
-import { audit, cases, clocks, people } from "./schema";
+import { audit, cases, clocks, people, recordAccess } from "./schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -75,7 +76,7 @@ export async function resetDemo() {
   const register = syntheticPeople();
   const now = Date.now();
 
-  await db.execute(sql`TRUNCATE access_log, audit, clocks, cases, calls, people RESTART IDENTITY CASCADE`);
+  await db.execute(sql`TRUNCATE access_log, record_access, audit, clocks, cases, calls, people RESTART IDENTITY CASCADE`);
   await db.insert(people).values(register);
 
   const seeds = caseSeeds(register);
@@ -111,6 +112,7 @@ export async function resetDemo() {
       })
       .returning({ id: cases.id });
     await db.insert(audit).values({ caseId: row.id, at: createdAt, action: "SubmitIntake", actor: "system", data: { seeded: true } });
+    await db.insert(recordAccess).values({ caseId: row.id, at: createdAt, holder: "call", mode: "write", parts: ["identity", "symptoms"], actor: "Polku agent" });
 
     for (let j = 0; j <= s.stepIndex; j++) {
       const step = lung.steps[j];
@@ -144,6 +146,15 @@ export async function resetDemo() {
         scheduledAt,
         unit,
       });
+      // Each finished step opened what it may; a booked step was booked on a callback.
+      const holder = holderOf(step.id);
+      if (stoppedAt) {
+        const openedAt = new Date(startedAt.getTime() + (stoppedAt.getTime() - startedAt.getTime()) * 0.3);
+        await db.insert(recordAccess).values({ caseId: row.id, at: openedAt, holder, mode: "read", parts: [...MAY_OPEN[holder]], actor: holder === "nurse" ? "Nurse" : `${step.name} staff` });
+      }
+      if (scheduledAt) {
+        await db.insert(recordAccess).values({ caseId: row.id, at: startedAt, holder: "call", mode: "write", parts: ["booking"], actor: "Polku agent" });
+      }
       if (stoppedAt) {
         await db.insert(audit).values({
           caseId: row.id,

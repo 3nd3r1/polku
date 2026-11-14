@@ -1,5 +1,7 @@
 import { boolean, date, integer, jsonb, pgTable, serial, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import type { Gap } from "../ontology/clarity";
 import type { Outcome } from "../ontology/engine";
+import type { Holder, RecordPart } from "../ontology/record";
 import type { Intake } from "../ontology/schema";
 import type { Person } from "../sim/people";
 
@@ -38,6 +40,8 @@ export const calls = pgTable("calls", {
   /** What the caller was told on this call. */
   outcome: text("outcome").$type<Outcome>(),
   transcript: jsonb("transcript").$type<TranscriptLine[]>().notNull().default([]),
+  /** The handoff packet as it fills: the last intake the agent sent and what was still missing. */
+  draft: jsonb("draft").$type<{ intake: Intake; gaps: Gap[] }>(),
 });
 
 /** Every tool call the agent makes, allowed or refused, and why. Append-only. */
@@ -103,4 +107,18 @@ export const audit = pgTable("audit", {
   action: text("action").notNull(),
   actor: text("actor", { enum: ["system", "nurse", "patient"] }).notNull(),
   data: jsonb("data"),
+});
+
+/** Every time a step opens or writes part of a patient's record. Append-only. */
+export const recordAccess = pgTable("record_access", {
+  id: serial("id").primaryKey(),
+  caseId: uuid("case_id")
+    .notNull()
+    .references(() => cases.id, { onDelete: "cascade" }),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  holder: text("holder").$type<Holder>().notNull(),
+  mode: text("mode", { enum: ["read", "write"] }).notNull(),
+  parts: jsonb("parts").$type<RecordPart[]>().notNull(),
+  /** Who, in plain words: "Polku agent", "Nurse". */
+  actor: text("actor").notNull(),
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { ConversationProvider } from "@elevenlabs/react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { SMOKING_LABEL, STEP_LABEL } from "@/ontology/labels";
@@ -9,7 +9,7 @@ import { CALLBACK_FIRST_MESSAGE } from "@/server/agent-tools";
 import type { CallView } from "@/server/calls";
 import type { CaseView } from "@/server/cases";
 import type { CalendarView, Priority, WorkItem } from "@/server/schedule";
-import { pause, post, useAgentCall } from "./agent-call";
+import { post, usePhone } from "./agent-call";
 import { clockTime, day, when } from "./time";
 
 const PRIORITY: Record<Priority, { label: string; color: string }> = {
@@ -19,15 +19,8 @@ const PRIORITY: Record<Priority, { label: string; color: string }> = {
 };
 const firstName = (c: CaseView) => c.person?.name.split(" ")[0] ?? "the patient";
 
+/** The task view: one task per patient, one decision each. */
 export function NurseInbox() {
-  return (
-    <ConversationProvider>
-      <NurseInner />
-    </ConversationProvider>
-  );
-}
-
-function NurseInner() {
   const [items, setItems] = useState<WorkItem[] | null>(null);
   const [calls, setCalls] = useState<CallView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(useSearchParams().get("case"));
@@ -56,11 +49,11 @@ function NurseInner() {
     <div className="flex min-h-0 flex-1">
       <aside className="flex w-80 shrink-0 flex-col border-r border-line">
         <p className="label flex h-11 shrink-0 items-center justify-between border-b border-line px-5">
-          <span>To book, most urgent first</span>
+          <span>Tasks, most urgent first</span>
           <span className="text-dim">{items?.length ?? ""}</span>
         </p>
         <div className="flex-1 overflow-y-auto">
-          {items?.length === 0 && <p className="p-5 text-sm text-dim">Everyone is booked.</p>}
+          {items?.length === 0 && <p className="p-5 text-sm text-dim">No tasks. Everyone is booked.</p>}
           {items?.map((it) => (
             <button
               key={it.case.id}
@@ -87,7 +80,7 @@ function NurseInner() {
 
       <main className="min-w-0 flex-1 overflow-y-auto">
         {selected && (
-          <Booking
+          <Task
             key={selected.case.id}
             item={selected}
             onAct={() => setSelectedId(selected.case.id)}
@@ -100,12 +93,25 @@ function NurseInner() {
   );
 }
 
-function Booking({ item, rank, call, onAct }: { item: WorkItem; rank: number; call: CallView | null; onAct: () => void }) {
+/** Each task opened is a read of the record, logged once per page load. */
+const opened = new Set<string>();
+
+type Mode = "accept" | "change" | "self";
+
+function Task({ item, rank, call, onAct }: { item: WorkItem; rank: number; call: CallView | null; onAct: () => void }) {
   const c = item.case;
   const [fetched, setFetched] = useState<CalendarView | null>(null);
   const cal = rank > 0 ? item.calendar : (fetched ?? item.calendar);
   const [picked, setPicked] = useState<string[]>(item.calendar.suggested);
-  const agent = useAgentCall();
+  const [mode, setMode] = useState<Mode>("accept");
+  const [error, setError] = useState<string | null>(null);
+  const phone = usePhone();
+
+  useEffect(() => {
+    if (opened.has(c.id)) return;
+    opened.add(c.id);
+    post(`/api/cases/${c.id}/open`);
+  }, [c.id]);
 
   // Once booked the patient leaves the list; their calendar is fetched directly so the booking shows.
   useEffect(() => {
@@ -123,21 +129,31 @@ function Booking({ item, rank, call, onAct }: { item: WorkItem; rank: number; ca
   const booked = sessions.find((s) => s.state === "booked");
   const offered = sessions.filter((s) => s.state === "offered").map((s) => s.at);
   const proposing = offered.length > 0 ? offered : picked;
+  const calling = call && call.status !== "ended";
+  const decided = Boolean(booked || offered.length || calling);
 
   function toggle(at: string) {
+    if (mode === "self") return setPicked([at]);
     setPicked((p) => (p.includes(at) ? p.filter((x) => x !== at) : p.length < 3 ? [...p, at].sort() : p));
   }
 
-  async function propose(simulate: boolean) {
+  async function accept() {
     onAct();
+    setError(null);
     const r = await post(`/api/cases/${c.id}/propose`, { times: picked });
-    if (!r.callId) return console.error(r.error);
-    if (simulate || !agent.available) simulateCallback(r.callId, c);
-    else agent.start(r.callId, CALLBACK_FIRST_MESSAGE);
+    if (!r.callId) return setError(r.error ?? "Could not start the callback");
+    if (phone.available && !phone.live) phone.start(r.callId, CALLBACK_FIRST_MESSAGE);
+  }
+
+  async function bookMyself() {
+    onAct();
+    setError(null);
+    const r = await post(`/api/cases/${c.id}/book`, { at: picked[0] });
+    if (!r.ok) setError(r.error ?? "Could not book");
   }
 
   return (
-    <div className="flex flex-col gap-8 px-8 py-8">
+    <div className="flex max-w-4xl flex-col gap-8 px-8 py-8">
       <header>
         {rank > 0 && (
           <p className="label flex items-center gap-2">
@@ -145,39 +161,23 @@ function Booking({ item, rank, call, onAct }: { item: WorkItem; rank: number; ca
             Priority {rank} · {PRIORITY[item.priority].label}
           </p>
         )}
-        <h1 className="mt-2 text-3xl font-light">{c.person?.name ?? "Unknown"}</h1>
+        <h1 className="mt-2 text-3xl font-light">
+          {booked ? `${step} booked for ${c.person?.name}` : `Book ${step.toLowerCase()} for ${c.person?.name ?? "the patient"}`}
+        </h1>
         <p className="mt-1 text-muted">
           {[c.intake.age, c.county, SMOKING_LABEL[c.intake.smoking]].filter((x) => x !== undefined && x !== null).join(" · ")}
         </p>
         {criterion && (
           <p className="mt-3 text-sm">
-            {criterion.gloss}
+            {criterion.gloss}.
             {source && (
               <a href={source.url} target="_blank" rel="noreferrer" className="ml-2 text-info hover:underline">
-                {source.spokenName.replace(/^the /, "")}
+                Source: {source.name}
               </a>
             )}
           </p>
         )}
       </header>
-
-      <section>
-        {cal.path && (
-          <p className="font-mono text-xs text-muted">
-            {step} within {cal.maxDays} days <span className="text-dim">→</span> {cal.path.capability}{" "}
-            <span className="text-dim">→</span> {cal.path.resource} <span className="text-dim">→</span> {cal.path.facility},{" "}
-            {cal.path.county}
-          </p>
-        )}
-        <Calendar cal={cal} picked={booked || offered.length ? [] : picked} onPick={booked || offered.length ? undefined : toggle} />
-        <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-dim">
-          <Key className="bg-raised" label="Taken" />
-          <Key className="border border-line-strong" label="Free" />
-          <Key className="bg-fg" label="Proposed" />
-          <Key className="bg-ok" label="Booked" />
-          <span>Limit {when(cal.dueAt)}</span>
-        </p>
-      </section>
 
       {booked ? (
         <section className="border-t border-line pt-6">
@@ -186,30 +186,107 @@ function Booking({ item, rank, call, onAct }: { item: WorkItem; rank: number; ca
             {step} {when(booked.at)}, {cal.path?.facility}
           </p>
           <p className={`mt-1 text-sm ${new Date(booked.at) <= new Date(cal.dueAt) ? "text-ok" : "text-warn"}`}>
-            {new Date(booked.at) <= new Date(cal.dueAt) ? "Within the time limit." : "After the time limit."} {name} picked it on the call.
+            {new Date(booked.at) <= new Date(cal.dueAt) ? "Within the time limit." : "After the time limit."}{" "}
+            {call?.access.some((e) => e.tool === "book_time" && e.verdict === "allowed") ? `${name} picked it on the callback.` : "Booked by the nurse."}
+          </p>
+          <p className="mt-4 text-sm text-muted">
+            The {step} unit has {name} now, with the same record.{" "}
+            <Link href="/handoffs" className="hover:text-fg">
+              See the handoff →
+            </Link>
           </p>
         </section>
-      ) : call && call.status !== "ended" ? null : (
-        <section className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-6">
-          <button
-            onClick={() => propose(false)}
-            disabled={picked.length === 0 || agent.live}
-            className="h-11 bg-fg px-5 text-sm text-black hover:bg-white disabled:opacity-40"
-          >
-            Call {name} and propose {picked.length === 1 ? "this time" : `these ${picked.length} times`}
-          </button>
-          {agent.available && (
-            <button onClick={() => propose(true)} disabled={picked.length === 0} className="text-sm text-muted hover:text-fg">
-              Play the call
-            </button>
-          )}
-          <p className="basis-full text-sm text-muted">
-            Polku calls {c.person?.phone}, checks it is {name} with Mobile ID, reads the times and books the one {name} picks.
+      ) : (
+        <section className="border-t border-line pt-6">
+          <p className="label">{offered.length ? "Offered to the patient" : mode === "self" ? "Pick the time you agreed" : "Proposed by the rules"}</p>
+          <p className="mt-2 text-sm text-muted">
+            Earliest free {step.toLowerCase()} times at {cal.path?.facility ?? "the unit"} before the limit, {when(cal.dueAt)} ({cal.maxDays} days,{" "}
+            <a href={cal.source.url} target="_blank" rel="noreferrer" className="text-info hover:underline">
+              {cal.source.name}
+            </a>
+            ).
           </p>
+          {mode === "accept" && (
+            <ul className="mt-4 border-t border-line">
+              {proposing.map((at, i) => (
+                <li key={at} className="flex items-baseline gap-4 border-b border-line py-3">
+                  <span className="font-mono text-xs text-dim">{i + 1}</span>
+                  <span className="text-xl font-light">{when(at)}</span>
+                  <span className={`text-sm ${new Date(at) <= new Date(cal.dueAt) ? "text-ok" : "text-warn"}`}>
+                    {new Date(at) <= new Date(cal.dueAt) ? "before the limit" : "after the limit"}
+                  </span>
+                </li>
+              ))}
+              {proposing.length === 0 && <li className="py-3 text-sm text-alert">No free time. Change times or call {name} yourself.</li>}
+            </ul>
+          )}
+          {mode !== "accept" && !decided && (
+            <>
+              <Calendar cal={cal} picked={picked} onPick={toggle} />
+              <p className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-dim">
+                <Key className="bg-raised" label="Taken" />
+                <Key className="border border-line-strong" label="Free" />
+                <Key className="bg-fg" label={mode === "self" ? "Picked" : "Proposed"} />
+                <span>Limit {when(cal.dueAt)}</span>
+              </p>
+            </>
+          )}
+
+          {!decided && (
+            <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+              {mode === "self" ? (
+                <>
+                  <button
+                    onClick={bookMyself}
+                    disabled={picked.length !== 1}
+                    className="h-11 bg-fg px-5 text-sm text-black hover:bg-white disabled:opacity-40"
+                  >
+                    {picked.length === 1 ? `Book ${when(picked[0])}` : "Pick one time"}
+                  </button>
+                  <span className="text-sm text-muted">Call {name} on {c.person?.phone}</span>
+                  <button onClick={() => setMode("accept")} className="text-sm text-muted hover:text-fg">
+                    Back
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={accept}
+                    disabled={picked.length === 0 || phone.live}
+                    className="h-11 bg-fg px-5 text-sm text-black hover:bg-white disabled:opacity-40"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPicked(picked.slice(0, 1));
+                      setMode("self");
+                    }}
+                    className="text-sm text-muted hover:text-fg"
+                  >
+                    I&apos;ll call {name} myself
+                  </button>
+                  {mode === "accept" ? (
+                    <button onClick={() => setMode("change")} className="text-sm text-muted hover:text-fg">
+                      Change times
+                    </button>
+                  ) : (
+                    <button onClick={() => setMode("accept")} className="text-sm text-muted hover:text-fg">
+                      Done
+                    </button>
+                  )}
+                  <p className="basis-full text-sm text-muted">
+                    On Accept, Polku calls {name}, checks it is them with Mobile ID, reads out the times and books the one {name} picks.
+                  </p>
+                </>
+              )}
+              {error && <p className="basis-full text-sm text-alert">{error}</p>}
+            </div>
+          )}
         </section>
       )}
 
-      {call && <CallProgress call={call} times={proposing} live={agent.live} onHangUp={agent.end} />}
+      {call && <CallProgress call={call} times={proposing} live={phone.live && phone.callId === call.id} onHangUp={phone.end} />}
     </div>
   );
 }
@@ -337,26 +414,4 @@ function CallProgress({ call, times, live, onHangUp }: { call: CallView; times: 
       </ol>
     </section>
   );
-}
-
-/** Scripted callback for demos without a voice: same endpoints and the same gate as a live call. SYNTHETIC. */
-async function simulateCallback(callId: string, c: CaseView) {
-  const say = (role: "agent" | "caller", text: string) => post(`/api/calls/${callId}/transcript`, { role, text });
-  const first = firstName(c);
-  await say("agent", CALLBACK_FIRST_MESSAGE);
-  await pause(1800);
-  await say("caller", `Oh, hello. Yes, it's ${c.person?.hetu}.`);
-  await pause(800);
-  await post(`/api/calls/${callId}/verify`, { hetu: c.person?.hetu ?? "" });
-  await say("agent", `Thank you, ${first}.`);
-  await pause(1200);
-  const r = await post(`/api/calls/${callId}/case`);
-  await say("agent", r.summary ?? r.error);
-  await pause(2200);
-  await say("caller", "The first one is good for me.");
-  await pause(1000);
-  const b = await post(`/api/calls/${callId}/book`, { option: 1 });
-  await say("agent", `${b.summary ?? b.error} Goodbye, ${first}.`);
-  await pause(800);
-  await post(`/api/calls/${callId}/end`);
 }

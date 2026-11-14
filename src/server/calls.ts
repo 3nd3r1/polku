@@ -43,6 +43,7 @@ export type CallView = {
   verifiedAt: string | null;
   outcome: Outcome | null;
   transcript: TranscriptLine[];
+  draft: (typeof calls.$inferSelect)["draft"];
   access: AccessEntry[];
   case: CaseView | null;
 };
@@ -65,6 +66,7 @@ export async function listCalls(limit = 30): Promise<CallView[]> {
     verifiedAt: r.verifiedAt?.toISOString() ?? null,
     outcome: r.outcome,
     transcript: r.transcript,
+    draft: r.draft,
     access: log
       .filter((l) => l.callId === r.id)
       .map((l) => ({ at: l.at.toISOString(), tool: l.tool, verdict: l.verdict ?? (l.allowed ? "allowed" : "refused"), detail: l.detail })),

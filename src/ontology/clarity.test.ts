@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missingQuestions } from "./clarity";
+import { gapLabel, gaps, missingQuestions } from "./clarity";
 
 describe("clarity", () => {
   it("asks for symptoms, duration and smoking when missing", () => {
@@ -18,6 +18,13 @@ describe("clarity", () => {
         observations: [{ code: "COUGH_NEW", durationDays: 49, quote: "seven weeks" }],
       }),
     ).toEqual([]);
+  });
+
+  it("names each gap for the screen", () => {
+    expect(gaps({ smoking: "unknown", observations: [{ code: "COUGH_NEW", quote: "I cough" }] }).map(gapLabel)).toEqual([
+      "How long: new cough",
+      "Smoking history",
+    ]);
   });
 
   it("never holds back a red flag", () => {

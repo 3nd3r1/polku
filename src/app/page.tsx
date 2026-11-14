@@ -1,5 +1,5 @@
-import { Screening } from "@/components/screening";
+import { CallScreen } from "@/components/call-screen";
 
-export default function ScreeningPage() {
-  return <Screening />;
+export default function CallsPage() {
+  return <CallScreen />;
 }

@@ -19,34 +19,32 @@ The demo moment is the phone ringing back. A judge makes the call, accepts the t
 
 ## Status
 
-| Element       | Where it stands                                                                                                            |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| The call      | Transcript, symptoms and criteria match work. The packet layout, missing fields and the full-screen red flag aren't built. |
-| Task view     | Worklist and proposed times in progress, not committed.                                                                    |
-| Callback      | `book_time` tool and the callback part of `agent/prompt.md` in progress, not committed. Browser call only.                 |
-| Handoff strip | Not built. The access log exists per call.                                                                                 |
+| Element       | Where it stands                                                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The call      | Built. Handoff packet fills during the call (symptoms with the caller's words, what's still missing, criterion with one source line), full-screen "Call 112", "Handed to the nurse, due ...". |
+| Task view     | Built. One task per patient, rule-proposed times, Accept or "I'll call myself" (nurse books directly). Calendar only behind "Change times".                             |
+| Callback      | Built. Accept starts the browser callback; `book_time` books the pick. Browser call only, no real phone yet.                                                            |
+| Handoff strip | Built at `/handoffs`. One line per patient, holder and deadline per handoff, parts of the record each step opened, full access log per patient (`record_access`).       |
 
 Already done underneath: lung pathway typed and sourced (`src/pathways/lung.ts`), rules engine with tests, identification gate (identity code and simulated Mobile ID, three failures lock the call), cases, clocks and audit in Postgres with live updates. Deployed at https://polku.eros.ender.fi, deploys on push.
 
 ## Next
 
-1. Finish and commit the task view and the callback.
-2. Call screen: packet layout, missing fields, full-screen red flag.
-3. Handoff strip.
-4. Move all demo tooling to `/demo` (see below).
-5. A phone at the table reaches the agent: QR web call, or a non-Finnish Twilio number (+358 needs a slow regulatory bundle). The callback only rings a real phone with Twilio. Without it the callback plays in the browser.
-6. Run the full loop 10 times on prod without a failure.
-7. Sat 18:00: freeze, record the video.
+1. Push the agent prompt change (`npm run agent:push`): it now calls `record_intake` early so the packet fills while the caller talks.
+2. A phone at the table reaches the agent: QR web call, or a non-Finnish Twilio number (+358 needs a slow regulatory bundle). The callback only rings a real phone with Twilio. Without it the callback plays in the browser.
+3. Run the full loop 10 times on prod without a failure.
+4. Sat 18:00: freeze, record the video.
 
 If time: Gemma on Verda as the agent's LLM (go/no-go was Sat 12:00, otherwise Gemini runs it). An eval set of scripted callers with expected outcomes, all red flags and adversarial calls included.
 
 ## Demo tooling, kept apart
 
-Anything that fakes part of the world for the demo lives on one page, `/demo`, never on the call, task or strip screens. Everything on it is labelled synthetic.
+Anything that fakes part of the world for the demo lives on one page, `/demo`, never on the call, task or strip screens. Everything on it is labelled synthetic. Code in `src/demo/` and `src/components/demo-tools.tsx`.
 
-- Scripted callers: Matti, Aino, red flag, Liisa (open case), Impostor. Now under "Play a call" on Screening.
-- Scripted callback for when there's no voice. Now in the nurse inbox (`simulateCallback`).
-- Demo reset (`/api/admin/reset`).
+- Call the line from the browser, with the role-card people and their identity codes.
+- Scripted callers: Matti, Aino, Liisa (open case), Seppo (emergency), Impostor.
+- Answer a waiting callback with a scripted patient, for when there's no voice.
+- Demo reset (`/api/admin/reset`, needs the admin token).
 - Synthetic register and resource calendars (`src/db/demo.ts`).
 
 ## Cut

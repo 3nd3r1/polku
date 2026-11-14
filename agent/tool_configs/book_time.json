@@ -1,14 +1,21 @@
 {
-    "description": "book_time client tool",
+    "description": "After get_case has read out numbered times: book the one the caller chose. Option 0 means none of the times suits. Returns the sentence to say.",
     "dynamic_variables": {
         "dynamic_variable_placeholders": {}
     },
-    "expects_response": false,
+    "expects_response": true,
     "name": "book_time",
     "parameters": {
-        "description": "Parameters for the client tool",
-        "properties": {},
-        "type": "object"
+        "type": "object",
+        "properties": {
+            "option": {
+                "type": "integer",
+                "description": "The number of the option the caller chose, or 0 if none suits."
+            }
+        },
+        "required": [
+            "option"
+        ]
     },
     "response_timeout_secs": 30,
     "type": "client"
