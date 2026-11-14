@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Tools built by shell.nix
 /.bin/
+
+# Agent skills: installed locally from skills-lock.json, not vendored
+/.agents/
