@@ -18,7 +18,7 @@ A phone line that puts every suspected lung cancer patient on the clock, run on 
 
 ```markdown
 ## The problem
-Finland trails Sweden and Norway by about 14 percentage points in 5-year lung cancer survival, and the national cancer strategy (2026-2035) sets closing that gap as a goal. Its headline equality indicator, "patients get treatment within target times", can't be measured per wellbeing county today: Finland has no national lung pathway yet, and no public per-county access-time data exists. Meanwhile counties promise different things: Pirkanmaa says CT within about a week of the referral being processed, Keski-Suomi says a specialist within about a month.
+Finland's national cancer strategy (2026-2035) sets a goal of raising 5-year lung cancer survival by 14 percentage points to reach the Nordic level. Its headline equality indicator, "patients get treatment within target times", can't be measured per wellbeing county today: Finland has no national lung pathway yet, and no public per-county access-time data exists. Meanwhile counties promise different things: Pirkanmaa says CT within about a week of the referral being processed, Keski-Suomi says a specialist within about a month.
 
 ## What Polku does
 **1. A phone call is the only patient interface.** Most cancer patients are older, and the best interface for them is the phone they already have. No app, no form. The caller is strongly identified (Mobile ID, simulated in the prototype), then describes their symptoms in their own words to a voice agent.
@@ -67,5 +67,3 @@ AstraZeneca: Equal Care Across Finland
 - Best Use of ElevenLabs
 - Best use of CRACI
 - Best Use of Codex
-
-Undecided: Oxylabs or Context.dev (pick one, only if it visibly drives the demo).

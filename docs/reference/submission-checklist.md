@@ -25,15 +25,7 @@ Final deadline: **Sun 15.11, 10:00**. Status must be **FINAL**, not DRAFT.
 - [ ] Every team member joined the team on the platform via the team code
 - [ ] Demo laptop ready for Sunday peer review and for a possible stage demo (they test the connection beforehand)
 
-## 2-minute video outline
-
-| Time | Content |
-|---|---|
-| 0:00–0:15 | Problem: who suffers and how much |
-| 0:15–0:30 | Solution in one sentence |
-| 0:30–1:30 | Live demo of the core flow |
-| 1:30–1:50 | Why it matters (impact, theme fit, partner tech used) |
-| 1:50–2:00 | Team plus call to action |
+Video beat sheet and stage plan: `../story-and-demo.md`.
 
 ## 3-minute stage pitch (if top 5)
 

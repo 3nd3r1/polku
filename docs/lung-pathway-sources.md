@@ -1,6 +1,6 @@
 # Lung pathway: sources, criteria, clocks, public data
 
-Researched Fri 13.11.2026. Every number below has a URL. "not verified" means I could not open the primary source myself.
+Researched Fri 13.11.2026. Every number has a URL. "Not verified" means we could not open the primary source. `src/pathways/lung.ts` encodes a subset of this.
 
 ## Source list (short names used below)
 
@@ -18,7 +18,7 @@ Researched Fri 13.11.2026. Every number below has a URL. "not verified" means I 
 | FI-KS | Keski-Suomen hyvinvointialue, "Keuhkosyöpäpotilaan hoitopolku" | https://www.hyvaks.fi/asiakkaana/hoitopolut/keuhkosyopapotilaan-hoitopolku | Read directly |
 | FI-KYS | KYS (Pohjois-Savo), "Keuhkosyöpäpotilaan hoitoketju" (slide PDF, date not verified) | https://syovanhoitokeskus.pshyvinvointialue.fi/documents/268336/269724/KYS+Keuhkosy%C3%B6p%C3%A4potilaan+hoitoketju.pdf/547c35a2-5382-68b4-5bac-afcff530959d | Read directly |
 
-## 1. Proposed lung pathway definition (ready to encode)
+## Step targets
 
 Calendar days. SVF is used as the backbone because it is the only one with a clock on every sub-step. DK and NO are shown for cross-checking. Clock start points differ by country (see caveats).
 
@@ -33,13 +33,13 @@ Calendar days. SVF is used as the backbone because it is the only one with a clo
 | 6 | Treatment start | Treatment decision → first treatment | **surgery 14, radiotherapy 14, drug 10, palliative 0** | as proposed | Completed investigation → start: surgery 14, medical 11, radiotherapy 15 | Completed investigation → start: surgery 14, drug 7, radiotherapy 14 | none for lung | SE-SVF |
 | Σ | Total (follow-up metric) | see column | **SE: 44 surgery/RT, 40 drug, 30 palliative** from well-founded suspicion | 40 / 44 / 30, 80 % of patients within | From referral received: surgery 44, medical 41, RT 45 | From referral received: surgery 42, drug 35, RT 42 | THL general rule: "maksimiaika lähetteen saapumisesta ensimmäiseen hoitoon ... on 6 viikkoa" (42 d) | Show SE total; show FI 42 d as the only Finnish number |
 
-Notes for the encoder:
+Notes:
 - SVF's sub-step times are "rekommenderade"; only the totals (40/44/30) are followed up nationally, with the goal "80 % av de patienter som utreds i ett SVF ska utredas inom ledtiderna."
 - NO times are "normerende", not legal limits.
 - DK numbers come from search-engine text of the sst.dk PDF (6 + 24 + 14/11/15 adds up to the stated 44/41/45, and the KORA report also quotes "41-45 dage"). Treat as **partially verified**.
 - The only Finnish target number is the generic THL 6-week rule (origin: STM working group, STM Selvityksiä 6/2010). It happens to equal NO's 42 days for surgery/RT, which is a good talking point.
 
-## 2. Criteria table
+## Criteria
 
 Two levels, as in all Nordic pathways: **suspicion** (send to imaging, a GP/nurse action) and **well-founded suspicion** (enter the fast-track pathway, a clinician action, usually needs imaging). Polku's patient front door can only ever reach the suspicion level, except SE-V3 (repeated haemoptysis), which is symptom-only.
 
@@ -73,7 +73,7 @@ Two levels, as in all Nordic pathways: **suspicion** (send to imaging, a GP/nurs
 
 Finland national criteria: **none exist**. FI-FILHA: "Valtakunnallisesti ei ole ollut tarkkaa yhtenäistä ohjeistusta siitä, millä aikataululla diagnostiikan eri osa-alueet tulisi olla tehtyinä." The programme will produce "kansallinen suositus keuhkosyövän diagnostiikasta. Se sisältää myös lähetekriteerit perusterveydenhuollolle ja suositellut aikarajat erikoissairaanhoitoon eri diagnostiikan polun vaiheille." (gloss: a national diagnostics recommendation, including referral criteria for primary care and recommended time limits for each step, is being drafted).
 
-## 3. Proposed SymptomCode vocabulary (28 codes)
+## Symptom codes
 
 `source` lists the criterion IDs above that use the code. Attributes on every observation: `onsetDate`, `durationDays`, `quotedSpan`, `confidence`.
 
@@ -110,7 +110,9 @@ Finland national criteria: **none exist**. FI-FILHA: "Valtakunnallisesti ei ole 
 
 Not included because no source uses them as criteria: fever, bone pain, finger clubbing, sputum, pleural effusion (DK-SYD lists some as "andre symptomer" only).
 
-## 4. Public data (what you can actually use this weekend)
+The red-flag codes `HAEMOPTYSIS_MASSIVE`, `DYSPNOEA_SEVERE` and `CHEST_PAIN_ACUTE_SEVERE` are Polku's own (see `build-plan.md`, Polku's own rules), not from any pathway.
+
+## Public data
 
 | Source | What it shows | Granularity | URL | Usable this weekend | Headline numbers (source, year) |
 |---|---|---|---|---|---|
@@ -119,17 +121,17 @@ Not included because no source uses them as criteria: fever, bone pain, finger c
 | Sotkanet REST API | No lung-cancer indicator found (searched all 3 797 indicator titles). Useful: **4404** daily smokers % age 20+ (2013-2024); **5643** cancer index, age-standardised, all cancers (2017-2024); **5083** median wait for specialised care at 31.12 (2017-2022, not cancer-specific) | 4404 and 5643: hyvinvointialue (23 incl. Helsinki, Åland), YTA, kunta. 5083: sairaanhoitopiiri only | https://sotkanet.fi/rest/1.1/json?indicator=4404&years=2024&genders=total (metadata: https://sotkanet.fi/rest/1.1/indicators/4404) | **Yes**: open JSON, no key | Daily smokers 2024: national **9.1 %**; lowest Helsinki and Åland **6.8 %**; highest Satakunta and Vantaa-Kerava **12.5 %**, Kymenlaakso **12.0 %**. Cancer index 2024 (all cancers, FI=100): Kainuu **79.4**, Lapland **89.9**, Helsinki **103.4** |
 | NORDCAN 2.0 | Incidence, mortality, survival, Nordic comparison | Country only, no Finnish regions | https://nordcan.iarc.who.int/en/dataviz/survival | Yes (interactive, export) | Tichanek et al., Clin Epidemiol 2023;15:503-510 (NORDCAN data), 5-yr relative survival 2016-2020: Norway men **26.6 %**, women **33.2 %**; Finland men **16.4 %**, women **25.5 %**. 1-yr: Finland men **43 %**, women **52.4 %** (others "over 50 %" / "about 60 %"). Sweden and Denmark values are in a table image, not verified. https://dovepress.com/survival-in-lung-cancer-in-the-nordic-countries-through-a-half-century-peer-reviewed-fulltext-article-CLEP |
 | FI-FILHA programme | Narrative stats, regional and education gaps | National, some regional | (see source list) | Yes, quotable | 5-yr survival Finland women ~**26 %**, men ~**17 %** vs Norway **34 %** / **27 %**. Education gap in 5-yr survival: men **13 %** basic vs **18 %** higher; women **20 %** vs **30 %**. Lung cancer costs ~**120 M€/yr** (2023). Programme goal: curative treatment **+10 %**, 5-yr survival **+14 %** |
-| THL cancer access monitoring (Hilmo, per FI-THL) | Defines time stamps: referral arrival, first visit, placed on waiting list, first treatment. Lung (C33-34) is in the monitored "muut syövät" list but has **no recommended max times** | n/a | (FI-THL) | **No**: I found no public report of cancer access times per hyvinvointialue or per hospital | none found |
+| THL cancer access monitoring (Hilmo, per FI-THL) | Defines time stamps: referral arrival, first visit, placed on waiting list, first treatment. Lung (C33-34) is in the monitored "muut syövät" list but has **no recommended max times** | n/a | (FI-THL) | **No**: we found no public report of cancer access times per hyvinvointialue or per hospital | none found |
 | Hyvinvointialue pathway pages | Published local promises for lung cancer, which already differ | One county each | FI-PIRHA, FI-KS, FI-KYS | Yes, quotable | Pirha: referral processed "1-2 arkipäivän sisällä", invitation in 3-4 working days, CT "useimmiten viikon sisällä lähetteen käsittelystä". Keski-Suomi: pulmonology visit "noin kuukauden sisällä lähetteen saapumisesta", goal "2-3 viikon sisällä" |
 | Denmark: Sundhedsdatastyrelsen quarterly monitoring | % of pakkeforløb within standard time, per region and cancer | Region | Search result: https://sundhedsdatastyrelsen.dk/media/16379/Monitoreringsmodel%20Organspecifik%20kraeft.pdf | Reference model only | Figures not verified |
 | Sweden: RCC SVF follow-up | SVF inclusion and ledtider per region | Region | https://cancercentrum.se/download/18.7c07b08019d24db18e31c22a/1774867469204/%C3%85rsapport%20%C3%B6verenskommelse%202025%20J%C3%A4mlik%20och%20effektiv%20cancerv%C3%A5rd%20med%20kortare%20v%C3%A4ntetider_bilaga%201%20SVF.pdf | Reference model only | Lung figures not verified |
 
 **Bottom line for the simulator:** real per-county inputs available now are lung incidence/stage/survival from the Syöpärekisteri app (manual export), smoking prevalence per hyvinvointialue (Sotkanet 4404), and population. **Per-county lung (or any cancer) access-time data is not public.** All step durations in the county view must be synthetic and labelled so. This is itself the insight: the strategy calls regional comparison "sporadic and coarse", Denmark and Sweden publish it per region every quarter/year.
 
-## 5. Caveats
+## Caveats
 
 **Where sources disagree**
-- Cough duration threshold: SE **6 weeks** (smokers/ex-smokers over 40); DK **4-6 weeks** (over 40, smoking emphasised but not required); FI Pirha patient advice **over 3 weeks** (no age/smoking condition); NO **no number** ("beyond what is usual"). Polku must pick one per rule and cite it. Suggest: SE-M1 as the fast-track match, FI-P1 as a softer "see your GP" match.
+- Cough duration threshold: SE **6 weeks** (smokers/ex-smokers over 40); DK **4-6 weeks** (over 40, smoking emphasised but not required); FI Pirha patient advice **over 3 weeks** (no age/smoking condition); NO **no number** ("beyond what is usual"). Polku uses SE-M1, SE-M2, SE-M3, DK-1 and DK-4 for fast track and FI-P1 as the softer "see your GP" match.
 - Haemoptysis: SE splits single (suspicion) vs repeated (well-founded even with a normal X-ray); DK and NO treat any haemoptysis as suspicion regardless of age/smoking.
 - Clock start: SE totals start at the **decision on well-founded suspicion**; DK and NO start at **referral received** by the investigating unit; THL's 6-week rule starts at **referral arrival**; THL's monitored intervals for breast/prostate/colorectal start at **placed on waiting list**. Totals are not directly comparable.
 - Drug-treatment start: SE 10 d after decision, NO 7 d after completed investigation, DK 11 d.

@@ -16,7 +16,7 @@ export async function startCall() {
 
 /**
  * Strong identification, SIMULATED: stands in for a Mobile ID (mobiilivarmenne)
- * request. Resolves to a synthetic person. See docs/18-phone-first.md.
+ * request. Resolves to a synthetic person. See docs/product.md.
  */
 export async function verifyIdentity(callId: string, personId?: string) {
   const [call] = await db.select().from(calls).where(eq(calls.id, callId));

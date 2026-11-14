@@ -45,8 +45,3 @@ Your solution should:
   - https://files.hackjunction.app/resources/Sy%C3%B6p%C3%A4strategiat%20ja%20sy%C3%B6p%C3%A4data_linkkikokoelma.pdf
 - Mentors Fri from 18:00: Hanna Rusila, Hanna Toivola, Kaisa Kaitila, Laura Aaltonen, Joanna Tuormaa. Sat: Kaisa Kaitila. Sun 14:00 judging.
 - Main contact: Joanna Tuormaa. Questions: Laura Aaltonen, +358 40 535 8447
-
-## Notes / idea seeds
-
-- Finnish reading ability helps a lot (the docs are in Finnish).
--

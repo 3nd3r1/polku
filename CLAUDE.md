@@ -8,15 +8,14 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 
 | Doc | What |
 |---|---|
-| `docs/18-phone-first.md` | **Phone first (the moat):** patients are mostly old, so the only patient interface is a phone call with strong identification. Staff screens: Screening, Nurse, Cockpit |
-| `docs/17-build-plan.md` | **Source of truth for what to build**: MVP scope, architecture, spikes, validation, timeline, video, landing page |
-| `docs/16-pitch.md` | The product pitch (story, insight, three surfaces, sovereign ontology, close) |
-| `docs/13-lung-pathway-sources.md` | Lung criteria (SE/DK/NO), step time limits, symptom-code vocabulary, public data sources. **Encode `src/pathways/lung.ts` from this.** |
-| `docs/10-concept.md` | Ontology design: object types, links, actions |
-| `docs/09-cancer-brief.md` | What the national cancer strategy and roadmap say (Goal 3, measures 2.5.2, 3.1.2, 3.5.3) |
-| `docs/14-tech-challenges.md` | Side prizes to stack (Gemini, Gemma, Verda, Aiven, ElevenLabs, CRACI, Codex, Oxylabs/Context.dev) and each one's job in the architecture |
-| `docs/15-synthesis.md` | Why Polku, edge moves for peer review and the stage |
-| `docs/reference/` | Event schedule, rules, submission checklist, the full AstraZeneca brief |
+| `docs/build-plan.md` | **Source of truth for what to build**: scope with status, Polku's own rules, architecture, spikes, validation, build order, timeline |
+| `docs/product.md` | What Polku is: problem, Matti, the three surfaces, phone first and identification, sovereign ontology, safety, business |
+| `docs/story-and-demo.md` | Story, wow moments, table/AstraZeneca/stage run of show, video beat sheet, facts to check, Q&A |
+| `docs/lung-pathway-sources.md` | Lung criteria (SE/DK/NO/FI), step time limits, symptom codes, public data. `src/pathways/lung.ts` is encoded from this |
+| `docs/strategy.md` | National cancer strategy and roadmap: Goal 3, measures 2.5.2, 3.1.2, 3.5.3, other evidence to verify |
+| `docs/tech-challenges.md` | Side prizes we enter and each one's job in the architecture |
+| `docs/submission.md` | Junction submission form draft |
+| `docs/reference/` | Event schedule, rules, submission checklist, the AstraZeneca brief |
 
 ## Hard rules
 
@@ -42,7 +41,7 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 - Node comes from `shell.nix`: run `nix-shell` first (NixOS, no global node)
 - Next.js 16 has breaking changes: read `AGENTS.md` and `node_modules/next/dist/docs/` before writing Next-specific code
 
-Planned layout (see build plan): `src/ontology/`, `src/pathways/`, `src/db/`, `src/sim/`, `src/app/` (`/`, `/console`, `/cockpit`, `/api/tools/intake`, `/api/events`), `eval/`, `agent/`.
+Layout: `src/ontology/`, `src/pathways/`, `src/db/`, `src/server/`, `src/sim/`, `src/app/` (`/` Screening, `/nurse`, `/ontology`, `/cockpit` todo, `/api/*`), `agent/`, `eval/` (todo).
 
 ## Working style
 

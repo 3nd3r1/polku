@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Symptom codes a patient can report by phone. Only codes used by at least one
- * encoded criterion are listed (see docs/13-lung-pathway-sources.md section 3).
+ * encoded criterion are listed (see docs/lung-pathway-sources.md, symptom codes).
  * Clinician-only codes (imaging, spirometry) are deliberately absent so the
  * extractor can never emit them.
  */

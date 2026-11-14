@@ -1,7 +1,7 @@
 import type { Pathway } from "../ontology/schema";
 
 /**
- * Lung cancer pathway, encoded from docs/13-lung-pathway-sources.md.
+ * Lung cancer pathway, encoded from docs/lung-pathway-sources.md.
  * Finland has no national lung criteria or step targets yet (roadmap 3.1.2,
  * 2.5.2), so Swedish SVF v1.4 is the backbone, with Danish and Finnish
  * regional criteria alongside. Patient self-report can only reach suspicion
@@ -37,7 +37,7 @@ export const lung = {
       id: "POLKU",
       title: "Polku design choice (not from a published pathway)",
       spokenName: "Polku's own safety rules",
-      url: "https://github.com/3nd3r1/polku/blob/main/docs/17-build-plan.md",
+      url: "https://github.com/3nd3r1/polku/blob/main/docs/build-plan.md#polkus-own-rules",
       verification: "design_choice",
     },
   ],

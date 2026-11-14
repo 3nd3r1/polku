@@ -86,12 +86,12 @@ const DEFAULT_LEAD: Record<string, number> = {
 
 const LEAD: Record<string, Partial<Record<string, { days: number; anchor?: string }>>> = {
   pirkanmaa: {
-    ct: { days: 5, anchor: "Pirha: CT 'useimmiten viikon sisällä lähetteen käsittelystä' (docs/13, FI-PIRHA)" },
-    pulmonology: { days: 4, anchor: "Pirha lung pathway (docs/13, FI-PIRHA)" },
+    ct: { days: 5, anchor: "Pirha: CT 'useimmiten viikon sisällä lähetteen käsittelystä' (docs/lung-pathway-sources.md, FI-PIRHA)" },
+    pulmonology: { days: 4, anchor: "Pirha lung pathway (docs/lung-pathway-sources.md, FI-PIRHA)" },
   },
   "keski-suomi": {
     ct: { days: 9 },
-    pulmonology: { days: 26, anchor: "Keski-Suomi: visit 'noin kuukauden sisällä lähetteen saapumisesta' (docs/13, FI-KS)" },
+    pulmonology: { days: 26, anchor: "Keski-Suomi: visit 'noin kuukauden sisällä lähetteen saapumisesta' (docs/lung-pathway-sources.md, FI-KS)" },
   },
 };
 
