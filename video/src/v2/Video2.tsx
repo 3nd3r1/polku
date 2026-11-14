@@ -3,6 +3,7 @@ import { AbsoluteFill, Html5Audio, Sequence, interpolate, staticFile, useCurrent
 import { Label } from "../components";
 import { C, FPS, MONO, s } from "../theme";
 import { PeopleCtx } from "./people";
+import { Soundtrack } from "./audio";
 import { A_Table, B_Text, C_Dial, D_Call, E_Promise, F_Nurse, G_112, H_Map, I_Code, J_Logo, PROMISE_CLOCK_START } from "./scenes2";
 
 // docs/story-and-demo.md, "Video (2:00 hard cap)". Beat timings kept; the last
@@ -82,6 +83,7 @@ export const PolkuVideo2: React.FC<{ people?: boolean }> = ({ people = false }) 
     <Sequence from={at("C-dial") + s(0.6)} durationInFrames={s(1.2)}>
       <Html5Audio src={staticFile("v2/ring.wav")} />
     </Sequence>
+    <Soundtrack people={people} sceneStart={at} />
     <Counter2 />
   </AbsoluteFill>
   </PeopleCtx.Provider>
