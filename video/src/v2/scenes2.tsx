@@ -3,7 +3,7 @@
  * Dialogue is the scripted Matti call from src/components/screening.tsx (synthetic people).
  */
 import React from "react";
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 import { Appear, ClockBar, Frame, Label, Square, Src, Subtitle, Wordmark, ease, pad2, useIn } from "../components";
 import { C, FPS, MONO, SANS, s } from "../theme";
 import { COUNTY_SEATS, makeDots } from "./finland";
@@ -107,7 +107,7 @@ const A_TableDrawn: React.FC = () => {
 export const B_Text: React.FC = () => {
   const f = useCurrentFrame();
   const n = Math.round(interpolate(f, [s(1.0), s(2.6)], [0, FACTS2.heroDays], { ...clamp, easing: ease }));
-  const out = interpolate(f, [s(9.5), s(10)], [1, 0], clamp);
+  const out = interpolate(f, [s(7.5), s(8)], [1, 0], clamp);
   return (
     <AbsoluteFill style={{ backgroundColor: C.base, fontFamily: SANS, color: C.fg, alignItems: "center", justifyContent: "center", opacity: out }}>
       <div style={{ textAlign: "center", maxWidth: 1400 }}>
@@ -185,7 +185,7 @@ const SAYS: Say[] = [
   { from: s(20.6), to: s(23.2), who: "caller", text: "No, nothing like that." },
   { from: s(23.4), to: s(26.0), who: "agent", text: "Do you smoke, or have you smoked before?" },
   { from: s(26.1), to: s(28.7), who: "caller", text: "I quit about ten years ago." },
-  { from: s(32.4), to: s(34.4), who: "agent", text: "Thank you. I have what I need." },
+  { from: s(31.0), to: s(33.0), who: "agent", text: "Thank you. I have what I need." },
 ];
 
 /** A phrase that leaves the subtitle and lands in the Screening panel. */
@@ -230,8 +230,8 @@ export const D_Call: React.FC = () => {
   const coughAt = s(14.6) + 14;
   const unexplainedAt = s(21.6);
   const smokeAt = s(26.9) + 14;
-  const ruleAt = s(29.0);
-  const matchAt = s(31.0);
+  const ruleAt = s(28.6);
+  const matchAt = s(29.8);
   const secs = 8 + Math.floor(f / FPS);
   return (
     <Frame section="Screening / live call / synthetic person">
@@ -692,8 +692,8 @@ export const H_Map: React.FC = () => {
   const f = useCurrentFrame();
   const fillAt = s(4.6);
   const sweep = s(2.4);
-  const tickAt = s(8.4);
-  const recAt = s(10.2);
+  const tickAt = s(7.8);
+  const recAt = s(8.4);
   const filled = f >= fillAt;
   const ks = COUNTY_SEATS[KS];
   const ksPt = project(ks.lon, ks.lat);
@@ -800,141 +800,290 @@ export const H_Map: React.FC = () => {
 };
 
 /* ------------------------------------------------------------------ */
-/* 1:47-1:59  The ending. Three hits on the beat, a breath, the drop:   */
-/* the logo slams, the path fills step by step, the deck's last line.   */
-/* Timed to the score at 120 BPM: the drop is at END_TIMES.drop.        */
+/* Shared by the last three beats. All times are scene-local seconds.  */
+/* The score's kicks land at x.15 / x.65 in each of them (measured).   */
 /* ------------------------------------------------------------------ */
-// Scene-local seconds. The score's kicks land at x.15 / x.65 here (measured), so every hit is on a kick.
-export const END_TIMES = { hits: [0.15, 1.15, 2.15], breath: 3.65, drop: 4.15, vo: 5.0 } as const;
 
 /** Closed-form damped spring step, 0 -> 1. z < 1 gives the tiny overshoot. */
 const spring01 = (t: number, w = 22, z = 0.72) => {
   if (t <= 0) return 0;
+  if (z >= 1) {
+    const x = w * t;
+    return 1 - Math.exp(-x) * (1 + x);
+  }
   const wd = w * Math.sqrt(1 - z * z);
   return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + ((z * w) / wd) * Math.sin(wd * t));
 };
 
-const HITS: { text: string; accent?: string }[] = [
-  { text: "One phone call." },
-  { text: "One rule, with a source." },
-  { text: "One promise, kept.", accent: "kept." },
-];
-// VO word onsets (k-vo-close.mp3, measured): first half 0-2.3 s, second half 2.48-4.9 s.
-const CLOSE_1 = "Let's close the path of oncology".split(" ");
-const CLOSE_2 = "with ontology and sovereign AI.".split(" ");
+/* ------------------------------------------------------------------ */
+/* 1:39-1:43.5  Built on sovereign AI. Verda, Europe.                   */
+/* ------------------------------------------------------------------ */
+export const P_TIMES = { vo: 0.3 } as const;
 
-const Word: React.FC<{ at: number; children: React.ReactNode; color?: string }> = ({ at, children, color }) => {
+export const P_Sovereign: React.FC = () => {
   const f = useCurrentFrame();
-  const e = spring01((f - at) / FPS, 26, 1);
+  const t = f / FPS;
+  const e = (at: number) => spring01(t - at, 24, 1);
+  const st = (at: number): React.CSSProperties => ({ opacity: e(at), filter: `blur(${(1 - e(at)) * 8}px)`, transform: `translateY(${(1 - e(at)) * 14}px)` });
+  // The words become a typed symptom: the quote dims as the chip lands.
+  const typed = e(1.9);
   return (
-    <span style={{ display: "inline-block", opacity: e, filter: `blur(${(1 - e) * 8}px)`, transform: `translateY(${(1 - e) * 14}px)`, color, marginRight: "0.26em" }}>
-      {children}
-    </span>
+    <Frame
+      section="Built on"
+      source={<Src id="VERDA">Qwen3 runs on Verda GPUs in Europe, on infrastructure we control</Src>}
+    >
+      <div style={{ position: "absolute", left: 96, top: 400, width: 900 }}>
+        <div style={{ ...st(0.15), fontSize: 104, fontWeight: 300, lineHeight: 1.05, letterSpacing: "-0.02em" }}>Sovereign AI.</div>
+        <div style={{ ...st(0.65), fontSize: 104, fontWeight: 300, lineHeight: 1.05, letterSpacing: "-0.02em", color: C.muted }}>On European soil.</div>
+      </div>
+      <div style={{ position: "absolute", left: 1080, top: 380, width: 744, border: `1px solid ${C.line}`, backgroundColor: C.panel, ...st(1.15) }}>
+        <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.lineStrong}`, display: "flex", justifyContent: "space-between" }}>
+          <Label size={15} color={C.fg}>
+            Qwen3 on Verda GPUs
+          </Label>
+          <Label size={15} color={C.ok}>
+            EU
+          </Label>
+        </div>
+        <div style={{ padding: "26px 24px 30px" }}>
+          <Label size={13} style={{ marginBottom: 10 }}>
+            Speech in
+          </Label>
+          <div style={{ fontSize: 30, fontWeight: 300, color: typed > 0.5 ? C.muted : C.fg }}>"cough for about seven weeks now"</div>
+          <Label size={13} style={{ margin: "28px 0 10px" }}>
+            Typed symptom out
+          </Label>
+          <div style={{ display: "flex", gap: 14, alignItems: "center", ...st(1.9) }}>
+            <span style={{ fontFamily: MONO, fontSize: 30, border: `1px solid ${C.fg}`, padding: "6px 14px" }}>COUGH_NEW</span>
+            <span style={{ fontFamily: MONO, fontSize: 26, color: C.muted }}>durationDays: 49</span>
+          </div>
+        </div>
+      </div>
+    </Frame>
   );
 };
+
+/* ------------------------------------------------------------------ */
+/* 1:43.5-1:51.5  The ontology today, then it grows. The build.        */
+/* Core = the real types (src/ontology/meta.ts). Growth is illustrative. */
+/* ------------------------------------------------------------------ */
+export const O_TIMES = { vo: 0.4, grow: 2.3, close: 6.5, collapse: 7.1, breath: 7.65 } as const;
+
+type ONode = { id: string; x: number; y: number; kind: "agent" | "case" | "pathway" | "care" };
+const CORE: ONode[] = [
+  { id: "Caller", x: -560, y: -250, kind: "agent" },
+  { id: "AI agent", x: 0, y: -330, kind: "agent" },
+  { id: "Nurse", x: 560, y: -250, kind: "agent" },
+  { id: "Patient", x: -560, y: -40, kind: "case" },
+  { id: "Call", x: -280, y: -140, kind: "case" },
+  { id: "Case", x: 0, y: -40, kind: "case" },
+  { id: "Clock", x: 280, y: -140, kind: "case" },
+  { id: "Appointment", x: 560, y: -40, kind: "case" },
+  { id: "Symptom", x: -280, y: 150, kind: "pathway" },
+  { id: "Criterion", x: 0, y: 200, kind: "pathway" },
+  { id: "Lung pathway", x: 280, y: 150, kind: "pathway" },
+  { id: "Step", x: 560, y: 220, kind: "pathway" },
+  { id: "Source", x: 0, y: 360, kind: "pathway" },
+  { id: "County", x: -560, y: 260, kind: "care" },
+  { id: "Hospital", x: 280, y: 360, kind: "care" },
+];
+const CORE_LINKS: [string, string][] = [
+  ["Caller", "Call"], ["AI agent", "Case"], ["Nurse", "Clock"],
+  ["Patient", "Call"], ["Call", "Case"], ["Case", "Clock"], ["Clock", "Appointment"],
+  ["Case", "Criterion"], ["Criterion", "Symptom"], ["Criterion", "Lung pathway"], ["Step", "Lung pathway"],
+  ["Clock", "Step"], ["Criterion", "Source"], ["Patient", "County"], ["Appointment", "Hospital"], ["Hospital", "County"],
+];
+const KIND_COLOR = { agent: C.ok, case: C.fg, pathway: C.info, care: C.warn } as const;
+const NEXT = [
+  "Breast", "Primary care", "Colorectal", "Imaging", "Prostate", "Pathology", "Skin", "Team decision",
+  "Pancreas", "Treatment", "Ovarian", "Follow-up", "Head and neck", "Rehabilitation", "Kidney", "Palliative care",
+];
+// Growth: clusters on a golden-angle spiral, each a hub with a ring of objects, linked to an earlier hub.
+const N_CLUSTERS = 90;
+const CLUSTERS = Array.from({ length: N_CLUSTERS }, (_, i) => {
+  const c = i + 1;
+  const r = 820 * Math.sqrt(c) + 300;
+  const a = c * 2.39996;
+  const x = r * Math.cos(a);
+  const y = r * Math.sin(a) * 0.62;
+  const parent = c <= 3 ? -1 : Math.floor((c - 1) * 0.5);
+  const n = 7 + ((c * 37) % 7);
+  const kids = Array.from({ length: n }, (_, k) => {
+    const b = (k / n) * Math.PI * 2 + c;
+    const rr = 150 + ((k * 53 + c * 11) % 90);
+    return { x: x + rr * Math.cos(b), y: y + rr * Math.sin(b) * 0.8, kind: (["case", "pathway", "care", "agent"] as const)[(k + c) % 4] };
+  });
+  return { x, y, r, parent, kids, title: NEXT[i] };
+});
+const ZOOM_END = 960 / (CLUSTERS[N_CLUSTERS - 1].r * 1.05);
+
+export const O_Ontology: React.FC = () => {
+  const f = useCurrentFrame();
+  const t = f / FPS;
+  const { grow, close, collapse, breath } = O_TIMES;
+  // Camera: hold, then pull back faster and faster (log-zoom eased in).
+  const g = interpolate(t, [grow, close + 0.2], [0, 1], clamp);
+  const z = Math.exp(Math.log(ZOOM_END) * g ** 2.2);
+  const view = 960 / z;
+  // Gaps close: a green wave runs out from the centre, then everything collapses into the path line.
+  const wave = interpolate(t, [close, collapse], [0, CLUSTERS[N_CLUSTERS - 1].r * 1.1], clamp);
+  const squash = interpolate(t, [collapse, breath - 0.05], [1, 0], { ...clamp, easing: Easing.in(Easing.cubic) });
+  const gone = t >= breath;
+  const born = (r: number) => view * 0.95 > r;
+  const bornAt = (r: number) => {
+    // invert view(t) > r/0.95 numerically on the frame grid: cheap, frames are few
+    for (let k = s(grow); k <= s(close + 0.2); k++) {
+      const gg = interpolate(k / FPS, [grow, close + 0.2], [0, 1], clamp);
+      if ((960 / Math.exp(Math.log(ZOOM_END) * gg ** 2.2)) * 0.95 > r) return k / FPS;
+    }
+    return 99;
+  };
+  const col = (kind: ONode["kind"], x: number, y: number) => (Math.hypot(x, y) < wave ? C.ok : KIND_COLOR[kind]);
+  const coreIn = (i: number) => spring01(t - (0.15 + i * 0.125), 30, 0.7);
+  const label = interpolate(z, [0.25, 0.6], [0, 1], clamp);
+  if (gone) return <AbsoluteFill style={{ backgroundColor: C.base }} />;
+  return (
+    <AbsoluteFill style={{ backgroundColor: C.base, fontFamily: SANS, color: C.fg }}>
+      <svg width={1920} height={1080} style={{ position: "absolute", inset: 0 }}>
+        <g transform={`translate(960 560) scale(${z} ${z * squash})`}>
+          {CLUSTERS.map((cl, i) => {
+            if (!born(cl.r)) return null;
+            const e = spring01(t - bornAt(cl.r), 26, 0.75);
+            const p = cl.parent >= 0 ? CLUSTERS[cl.parent] : { x: 0, y: 0 };
+            const w = 1.2 / z;
+            return (
+              <g key={i} opacity={Math.min(1, e * 1.4)}>
+                <line x1={p.x} y1={p.y} x2={p.x + (cl.x - p.x) * e} y2={p.y + (cl.y - p.y) * e} stroke={C.lineStrong} strokeWidth={w} />
+                {cl.kids.map((k, j) => (
+                  <line key={j} x1={cl.x} y1={cl.y} x2={cl.x + (k.x - cl.x) * e} y2={cl.y + (k.y - cl.y) * e} stroke={C.line} strokeWidth={w} />
+                ))}
+                {cl.kids.map((k, j) => {
+                  const sz = (10 / Math.max(z, 0.12)) * e;
+                  return <rect key={j} x={cl.x + (k.x - cl.x) * e - sz / 2} y={cl.y + (k.y - cl.y) * e - sz / 2} width={sz} height={sz} fill={col(k.kind, k.x, k.y)} />;
+                })}
+                <rect x={cl.x - 14 / Math.max(z, 0.12)} y={cl.y - 14 / Math.max(z, 0.12)} width={28 / Math.max(z, 0.12)} height={28 / Math.max(z, 0.12)} fill="none" stroke={col("case", cl.x, cl.y)} strokeWidth={2 / z} />
+                {cl.title && (
+                  <text x={cl.x} y={cl.y - 40 / Math.max(z, 0.12)} fontFamily={SANS} fontSize={34 / Math.max(z, 0.2)} fill={C.fg} textAnchor="middle" opacity={e * interpolate(z, [0.12, 0.3], [0, 1], clamp)}>
+                    {cl.title}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+          {/* The core: today's ontology */}
+          {CORE_LINKS.map(([a, b], i) => {
+            const A = CORE.find((n) => n.id === a)!;
+            const B = CORE.find((n) => n.id === b)!;
+            const e = Math.min(coreIn(CORE.indexOf(A)), coreIn(CORE.indexOf(B)));
+            return <line key={i} x1={A.x} y1={A.y} x2={A.x + (B.x - A.x) * e} y2={A.y + (B.y - A.y) * e} stroke={C.lineStrong} strokeWidth={2 / z} opacity={e} />;
+          })}
+          {CORE.map((n, i) => {
+            const e = coreIn(i);
+            const sz = (n.kind === "agent" ? 30 : 22) * e / Math.max(z, 0.25);
+            return (
+              <g key={n.id} opacity={Math.min(1, e * 1.5)}>
+                <rect x={n.x - sz / 2} y={n.y - sz / 2} width={sz} height={sz} fill={col(n.kind, n.x, n.y)} />
+                <text x={n.x} y={n.y + 52} fontFamily={SANS} fontSize={30} fill={C.fg} textAnchor="middle" opacity={label}>
+                  {n.id}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+      <div style={{ position: "absolute", left: 96, top: 88, opacity: spring01(t, 24, 1) * interpolate(t, [grow + 0.4, grow + 0.9], [1, 0], clamp) }}>
+        <Label size={18} color={C.fg}>
+          Ontology / today: lung
+        </Label>
+        <div style={{ display: "flex", gap: 22, marginTop: 14 }}>
+          {(Object.keys(KIND_COLOR) as ONode["kind"][]).map((k) => (
+            <span key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: MONO, fontSize: 15, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <Square size={10} color={KIND_COLOR[k]} />
+              {k === "agent" ? "agents" : k === "case" ? "patients and cases" : k === "pathway" ? "symptoms and rules" : "care"}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div style={{ position: "absolute", left: 96, bottom: 80, opacity: squash * interpolate(t, [grow, grow + 0.3], [0, 1], clamp) }}>
+        <Label size={16}>Lung: built this weekend / the rest: illustrative</Label>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/* 1:51.5-1:59.5  The drop: the logo slams, the path fills step by     */
+/* step, the VO says the deck's last line, then the line lands whole.  */
+/* ------------------------------------------------------------------ */
+export const END_TIMES = { drop: 0.15, vo: 0.6 } as const;
+// k-vo-close.mp3 is speech until 4.9 s (measured); the line appears right after.
+const lineAt = END_TIMES.vo + 4.95;
 
 export const K_End: React.FC = () => {
   const f = useCurrentFrame();
   const t = f / FPS;
-  const { hits, breath, drop, vo } = END_TIMES;
-  // Hit lines: each one slams in on its beat and is blurred away by the next.
-  const hit = t < breath ? HITS.findIndex((_, i) => t >= hits[i] && (i === HITS.length - 1 || t < hits[i + 1])) : -1;
+  const { drop } = END_TIMES;
   const dropped = t >= drop;
   const logo = spring01(t - drop, 20, 0.7);
   const flash = interpolate(t, [drop, drop + 0.25], [0.16, 0], clamp);
-  // The path: a hairline draws out from the centre, then 7 steps fill on the beat.
   const pathW = 1100 * interpolate(t, [drop + 0.05, drop + 0.7], [0, 1], { ...clamp, easing: ease });
   const steps = 7;
-  const outro = interpolate(t, [11.4, 12], [1, 0], clamp);
+  const outro = interpolate(t, [7.6, 8], [1, 0], clamp);
+  const line = spring01(t - lineAt, 26, 1);
+  if (!dropped) return <AbsoluteFill style={{ backgroundColor: C.base }} />;
   return (
     <AbsoluteFill style={{ backgroundColor: C.base, fontFamily: SANS, color: C.fg, alignItems: "center", justifyContent: "center", opacity: outro }}>
-      {hit >= 0 && (
-        <div key={hit} style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {(() => {
-            const at = hits[hit];
-            const e = spring01(t - at, 30, 0.75);
-            const next = hit < HITS.length - 1 ? hits[hit + 1] : breath;
-            const x = interpolate(t, [next - 0.1, next], [0, 1], clamp);
-            const h = HITS[hit];
-            const [pre, acc] = h.accent ? [h.text.slice(0, -h.accent.length), h.accent] : [h.text, ""];
-            return (
-              <div
-                style={{
-                  fontSize: 132,
-                  fontWeight: 300,
-                  letterSpacing: "-0.02em",
-                  opacity: Math.min(1, e * 1.4) * (1 - x),
-                  filter: `blur(${(1 - Math.min(1, e)) * 10 + x * 12}px)`,
-                  transform: `scale(${1.12 - 0.12 * e})`,
-                }}
-              >
-                {pre}
-                {acc && <span style={{ color: C.ok }}>{acc}</span>}
-              </div>
-            );
-          })()}
-          <div style={{ position: "absolute", top: 300, fontFamily: MONO, fontSize: 22, color: C.muted, letterSpacing: "0.2em" }}>
-            {HITS.map((_, i) => (
-              <span key={i} style={{ color: i <= hit ? C.fg : C.lineStrong, margin: "0 14px" }}>
-                0{i + 1}
-              </span>
-            ))}
-          </div>
+      <AbsoluteFill style={{ backgroundColor: C.fg, opacity: flash }} />
+      <div style={{ position: "absolute", top: 250, opacity: Math.min(1, logo * 1.5), transform: `scale(${1.3 - 0.3 * logo})`, filter: `blur(${Math.max(0, 1 - logo * 1.6) * 14}px)` }}>
+        <Wordmark height={150} />
+      </div>
+      {/* The path */}
+      <div style={{ position: "absolute", top: 520, left: 960 - pathW / 2, width: pathW, height: 2, backgroundColor: C.lineStrong }} />
+      {Array.from({ length: steps }).map((_, i) => {
+        const at = drop + 0.25 + i * 0.25;
+        const on = spring01(t - at, 30, 0.7);
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              top: 521 - 9,
+              left: 960 - 550 + (i * 1100) / (steps - 1) - 9,
+              width: 18,
+              height: 18,
+              backgroundColor: t >= at + 0.15 ? C.ok : C.fg,
+              opacity: Math.min(1, on * 1.5),
+              transform: `scale(${on})`,
+            }}
+          />
+        );
+      })}
+      {/* The closing line lands whole once the VO has said it: the last frame reads like the deck's last slide. */}
+      <div
+        style={{
+          position: "absolute",
+          top: 600,
+          width: 1500,
+          textAlign: "center",
+          fontSize: 64,
+          fontWeight: 300,
+          lineHeight: 1.3,
+          opacity: line,
+          filter: `blur(${(1 - line) * 8}px)`,
+          transform: `translateY(${(1 - line) * 14}px)`,
+        }}
+      >
+        <div>Let's close the path of oncology</div>
+        <div>
+          with <span style={{ color: C.ok }}>ontology</span> and <span style={{ color: C.ok }}>sovereign AI.</span>
         </div>
-      )}
-
-      {dropped && (
-        <>
-          <AbsoluteFill style={{ backgroundColor: C.fg, opacity: flash }} />
-          <div style={{ position: "absolute", top: 250, opacity: Math.min(1, logo * 1.5), transform: `scale(${1.3 - 0.3 * logo})`, filter: `blur(${Math.max(0, 1 - logo * 1.6) * 14}px)` }}>
-            <Wordmark height={150} />
-          </div>
-          {/* The path */}
-          <div style={{ position: "absolute", top: 520, left: 960 - pathW / 2, width: pathW, height: 2, backgroundColor: C.lineStrong }} />
-          {Array.from({ length: steps }).map((_, i) => {
-            const at = drop + 0.25 + i * 0.25;
-            const on = spring01(t - at, 30, 0.7);
-            const done = t >= at + 0.15;
-            return (
-              <div
-                key={i}
-                style={{
-                  position: "absolute",
-                  top: 521 - 9,
-                  left: 960 - 550 + (i * 1100) / (steps - 1) - 9,
-                  width: 18,
-                  height: 18,
-                  backgroundColor: done ? C.ok : C.fg,
-                  opacity: Math.min(1, on * 1.5),
-                  transform: `scale(${on})`,
-                }}
-              />
-            );
-          })}
-          <div style={{ position: "absolute", top: 600, width: 1500, textAlign: "center", fontSize: 64, fontWeight: 300, lineHeight: 1.3 }}>
-            <div>
-              {CLOSE_1.map((w, i) => (
-                <Word key={i} at={s(vo + (i * 2.1) / CLOSE_1.length)}>
-                  {w}
-                </Word>
-              ))}
-            </div>
-            <div>
-              {CLOSE_2.map((w, i) => (
-                <Word key={i} at={s(vo + 2.48 + (i * 2.2) / CLOSE_2.length)} color={w === "ontology" || w === "sovereign" || w === "AI." ? C.ok : undefined}>
-                  {w}
-                </Word>
-              ))}
-            </div>
-          </div>
-          <Appear at={s(9.6)} dur={10} style={{ position: "absolute", bottom: 150, fontFamily: MONO, fontSize: 24, color: C.fg, letterSpacing: "0.06em" }}>
-            polku.ender.fi <span style={{ color: C.dim }}>/</span> github.com/3nd3r1/polku <span style={{ color: C.muted }}>(MIT)</span>
-          </Appear>
-          <Appear at={s(9.9)} dur={10} style={{ position: "absolute", left: 96, bottom: 70 }}>
-            <Label size={16}>Junction 2026 / AstraZeneca: Equal Care Across Finland / synthetic data only</Label>
-          </Appear>
-        </>
-      )}
+      </div>
+      <Appear at={s(lineAt + 0.5)} dur={10} style={{ position: "absolute", bottom: 150, fontFamily: MONO, fontSize: 24, color: C.fg, letterSpacing: "0.06em" }}>
+        polku.ender.fi <span style={{ color: C.dim }}>/</span> github.com/3nd3r1/polku <span style={{ color: C.muted }}>(MIT)</span>
+      </Appear>
+      <Appear at={s(lineAt + 0.8)} dur={10} style={{ position: "absolute", left: 96, bottom: 70 }}>
+        <Label size={16}>Junction 2026 / AstraZeneca: Equal Care Across Finland / synthetic data only</Label>
+      </Appear>
     </AbsoluteFill>
   );
 };

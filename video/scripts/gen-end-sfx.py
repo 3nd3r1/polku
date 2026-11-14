@@ -1,6 +1,7 @@
 """Synthesize the ending's build: a riser locked to the score's 120 BPM grid, and a sub thump for each hit.
 Pure numpy, deterministic. Usage: python3 scripts/gen-end-sfx.py
-The riser runs 3.5 s: snare roll 8ths -> 16ths -> 32nds -> 64ths over an opening noise sweep, hard stop."""
+The build runs 7.5 s: snare roll 8ths -> 16ths -> 32nds -> 64ths over an opening noise sweep and a rising
+Shepard tone, hard stop at the breath before the drop."""
 import os, wave
 import numpy as np
 
@@ -40,26 +41,42 @@ def snare(dur=0.09):
     return 0.5 * body + 0.7 * noise
 
 
-# Riser: 7 beats of 0.5 s = 3.5 s.
-LEN = 3.5
-n = int(LEN * SR)
-t = np.arange(n) / SR
-p = t / LEN
-sweep = lowpass(rng.standard_normal(n), 250 * (40 ** p)) * (0.05 + 0.6 * p**2.2)
-roll = np.zeros(n)
-grid = [(0.0, 1.0, BEAT / 2), (1.0, 2.0, BEAT / 4), (2.0, 3.0, BEAT / 8), (3.0, 3.5, BEAT / 16)]
-hit = snare()
-for a, b, step in grid:
-    k = a
-    while k < b - 1e-9:
-        i = int(k * SR)
-        g = 0.25 + 0.75 * (k / LEN) ** 1.5
-        seg = hit[: n - i] * g
-        roll[i : i + len(seg)] += seg
-        k += step
-x = sweep + 0.55 * roll
-x[-int(0.004 * SR) :] *= np.linspace(1, 0, int(0.004 * SR))  # hard stop, no click
-write("end-riser.wav", x / np.abs(x).max() * 0.9)
+def riser(length, grid, shepard=False):
+    """Noise sweep + snare roll on `grid` [(from, to, step) in s]; optional rising Shepard tone. Hard stop."""
+    n = int(length * SR)
+    t = np.arange(n) / SR
+    p = t / length
+    sweep = lowpass(rng.standard_normal(n), 250 * (40 ** p)) * (0.05 + 0.6 * p**2.2)
+    roll = np.zeros(n)
+    hit = snare()
+    for a, b, step in grid:
+        k = a
+        while k < b - 1e-9:
+            i = int(k * SR)
+            g = 0.25 + 0.75 * (k / length) ** 1.5
+            seg = hit[: n - i] * g
+            roll[i : i + len(seg)] += seg
+            k += step
+    x = sweep + 0.55 * roll
+    if shepard:
+        # Endlessly rising tone: octave layers gliding up, each faded by a bell over log-frequency.
+        tone = np.zeros(n)
+        for o in range(6):
+            pos = (o + p * 2.0) % 6  # two octaves of rise over the length
+            f = 55 * 2**pos
+            amp = np.exp(-0.5 * ((pos - 3) / 1.1) ** 2)
+            tone += np.sin(2 * np.pi * np.cumsum(f) / SR) * amp
+        x += tone * (0.04 + 0.22 * p**1.6)
+    # Drive: saturate so the build is loud in RMS, not just on its peaks, and louder still at the top.
+    x = x / np.abs(x).max()
+    x = np.tanh(x * (2 + 6 * p)) / np.tanh(8)
+    x[-int(0.004 * SR) :] *= np.linspace(1, 0, int(0.004 * SR))  # hard stop, no click
+    return x / np.abs(x).max() * 0.9
+
+
+# The ontology build: 15 beats = 7.5 s, 8ths -> 16ths -> 32nds -> 64ths, ending at the breath.
+B = BEAT
+write("onto-build.wav", riser(7.5, [(0, 6 * B, B / 2), (6 * B, 10 * B, B / 4), (10 * B, 13 * B, B / 8), (13 * B, 15 * B, B / 16)], shepard=True))
 
 # Sub thump: pitch drop 110 -> 42 Hz, short click on top.
 d = 0.6
@@ -69,4 +86,4 @@ ph = 2 * np.pi * np.cumsum(f) / SR
 thump = np.sin(ph) * np.exp(-t / 0.18)
 thump[: int(0.003 * SR)] += rng.standard_normal(int(0.003 * SR)) * 0.4
 write("end-thump.wav", thump / np.abs(thump).max() * 0.9)
-print("ok end-riser.wav end-thump.wav")
+print("ok onto-build.wav end-thump.wav")

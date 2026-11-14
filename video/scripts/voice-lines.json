@@ -125,6 +125,17 @@
       "id": "k-vo-close",
       "voice": "narrator",
       "text": "Let's close the path of oncology, with ontology and sovereign AI."
+    },
+    {
+      "id": "p-vo",
+      "voice": "narrator",
+      "text": "It runs on sovereign AI, on Verda, on European soil."
+    },
+    {
+      "id": "o-vo",
+      "voice": "narrator",
+      "text": "This is the ontology today. Every new pathway grows it, along the whole chain, until the gaps close.",
+      "speed": 1.1
     }
   ]
 }

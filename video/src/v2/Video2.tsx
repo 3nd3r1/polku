@@ -4,20 +4,24 @@ import { Label } from "../components";
 import { C, FPS, MONO, s } from "../theme";
 import { PeopleCtx } from "./people";
 import { MusicBed, Soundtrack } from "./audio";
-import { A_Table, B_Text, C_Dial, D_Call, E_Promise, F_Nurse, G_112, H_Map, K_End, PROMISE_CLOCK_START } from "./scenes2";
+import { A_Table, B_Text, C_Dial, D_Call, E_Promise, F_Nurse, G_112, H_Map, K_End, O_Ontology, P_Sovereign, PROMISE_CLOCK_START } from "./scenes2";
 
-// docs/story-and-demo.md, "Video (2:00 hard cap)". The code flash and the old logo card are
-// replaced by one 12 s ending timed to the score; the cut lands at 1:59, under the cap.
+// docs/story-and-demo.md, "Video (2:00 hard cap)". Ending: partners, the ontology build, the drop.
+// Every length is a multiple of 0.5 s so the score's 120 BPM grid stays put; the cut lands at 1:59.
+// `src` is where the scene's slice of the score starts (score.mp3 seconds): the score was composed
+// to the original scene lengths, so each scene plays its own section, trimmed to its new length.
 export const SCENES2 = [
-  { id: "A-table", sec: 12, C: A_Table }, // 0:00-0:12
-  { id: "B-text", sec: 10, C: B_Text }, // 0:12-0:22
-  { id: "C-dial", sec: 8, C: C_Dial }, // 0:22-0:30
-  { id: "D-call", sec: 35, C: D_Call }, // 0:30-1:05
-  { id: "E-promise", sec: 7, C: E_Promise }, // 1:05-1:12
-  { id: "F-nurse", sec: 13, C: F_Nurse }, // 1:12-1:25
-  { id: "G-112", sec: 8, C: G_112 }, // 1:25-1:33
-  { id: "H-map", sec: 14, C: H_Map }, // 1:33-1:47
-  { id: "K-end", sec: 12, C: K_End }, // 1:47-1:59
+  { id: "A-table", sec: 10.5, src: 0, C: A_Table }, // 0:00-0:10.5
+  { id: "B-text", sec: 8, src: 12, C: B_Text }, // -0:18.5
+  { id: "C-dial", sec: 8, src: 22, C: C_Dial }, // -0:26.5
+  { id: "D-call", sec: 33.5, src: 30, C: D_Call }, // -1:00
+  { id: "E-promise", sec: 7, src: 65, C: E_Promise }, // -1:07
+  { id: "F-nurse", sec: 13, src: 72, C: F_Nurse }, // -1:20
+  { id: "G-112", sec: 7.5, src: 85, C: G_112 }, // -1:27.5
+  { id: "H-map", sec: 11, src: 93, C: H_Map }, // -1:38.5
+  { id: "P-sovereign", sec: 4.5, src: 100, C: P_Sovereign }, // -1:43
+  { id: "O-ontology", sec: 8, src: 104.5, C: O_Ontology }, // -1:51
+  { id: "K-end", sec: 8, src: null, C: K_End }, // -1:59
 ] as const;
 
 const starts: number[] = [];
@@ -83,7 +87,7 @@ export const PolkuVideo2: React.FC<{ people?: boolean }> = ({ people = false }) 
       <Html5Audio src={staticFile("v2/ring.wav")} />
     </Sequence>
     <Soundtrack people={people} sceneStart={at} />
-    <MusicBed people={people} sceneStart={at} scenes={SCENES2.map((x) => x.id)} />
+    <MusicBed people={people} sceneStart={at} scenes={SCENES2} />
     <Counter2 />
   </AbsoluteFill>
   </PeopleCtx.Provider>
