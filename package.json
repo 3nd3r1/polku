@@ -12,7 +12,8 @@
     "db:up": "docker compose up -d",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
-    "agent:push": "tsx agent/sync.ts && cd agent && elevenlabs tools push && elevenlabs agents push"
+    "agent:push": "tsx agent/sync.ts && cd agent && elevenlabs tools push && elevenlabs agents push",
+    "start:prod": "drizzle-kit push --force && tsx src/db/seed.ts --if-empty && next start -H 0.0.0.0 -p 3000"
   },
   "dependencies": {
     "@elevenlabs/react": "1.22.1",

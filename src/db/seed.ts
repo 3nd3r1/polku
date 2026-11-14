@@ -1,7 +1,8 @@
 /**
  * Resets the demo database to a known SYNTHETIC state: the population
  * register and a set of open cases at different pathway steps.
- * Destroys all calls and cases. Run with `npm run db:seed`.
+ * Destroys all calls and cases. Run with `npm run db:seed`; with --if-empty
+ * it only seeds a database that has no people yet.
  */
 import { evaluate } from "../ontology/engine";
 import type { Intake } from "../ontology/schema";
@@ -48,6 +49,15 @@ async function main() {
   const { sql } = await import("drizzle-orm");
   const { db } = await import("./index");
   const { audit, cases, clocks, people } = await import("./schema");
+
+  // Production boot runs with --if-empty: seed once, never wipe a running demo.
+  if (process.argv.includes("--if-empty")) {
+    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(people);
+    if (n > 0) {
+      console.log(`Register already has ${n} people. Not seeding.`);
+      process.exit(0);
+    }
+  }
 
   const register = syntheticPeople();
   const now = Date.now();
