@@ -9,6 +9,11 @@
   Junction 2026 / AstraZeneca "Equal Care Across Finland"
 </p>
 
+<p align="center">
+  < href="docs/Polku-white-paper.pdf"><b>Read our research paper here</b></a>
+  &nbsp;(<a href="docs/Polku-white-paper-print.pdf">print version</a>)
+</p>
+
 ---
 
 **Polku does the handoffs between cancer care steps.** A patient calls a phone line and describes their symptoms. A rules engine checks them against published Nordic lung cancer criteria. The nurse gets one small task with a time already proposed. They accept, Polku calls the patient back and books it, and the case moves on to the next step with its own clock.
