@@ -56,16 +56,14 @@ export function sayThis(evaluation: Evaluation, pathway: Pathway, callbackDueAt?
   const callback = pathway.steps.find((s) => s.id === "callback");
   switch (evaluation.outcome) {
     case "call_112":
-      return "What you describe needs emergency care. Please hang up and call 112 now.";
+      return "Please hang up and call 112 now. Goodbye.";
     case "fast_track": {
-      const c = evaluation.matches[0].criterion;
-      const source = pathway.sources.find((s) => s.id === c.sourceId);
       const when = callbackDueAt ? `by ${spokenDayTime(callbackDueAt)}` : `within ${callback?.maxDays ?? 2} days`;
-      return `Your symptoms match a published criterion for a fast-track assessment, from ${source?.spokenName ?? c.sourceId}. This is not a diagnosis. A nurse will review it, and we will call you ${when} to book a time.`;
+      return `Thank you. A nurse will call you ${when} to arrange your next step.`;
     }
     case "see_gp":
-      return "Your symptoms don't match a fast-track criterion, but they are worth checking. Please book an appointment at your health centre.";
+      return "Please contact your health centre for an appointment.";
     case "no_match":
-      return "Your symptoms don't match the criteria I check. If you are worried or they get worse, contact your health centre.";
+      return "If you need help, contact your health centre.";
   }
 }

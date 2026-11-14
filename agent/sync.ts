@@ -116,10 +116,9 @@ function workflow() {
       ),
       check_case: agentNode(
         "2 Check case",
-        "Step 2: the caller is identified. Greet them by first name and call get_case. If they have an open case, tell them the returned sentence word for word and ask whether anything is new or worse.",
+        "Step 2: the caller is identified. Greet them by first name and call get_case exactly once. After it returns, do not call get_case again. Use the result and speak to the caller: if there are numbered times, read them and ask which suits; if there is an open case, say the returned sentence word for word and ask whether anything is new or worse; if there is no open case, ask what symptoms they have been having. Follow the matching workflow transition. Never stay silent or repeat the case lookup.",
         420,
         ["case_to_book", "case_to_symptoms", "case_to_end"],
-        "get_case",
       ),
       book: agentNode(
         "3 Book a time",
@@ -129,7 +128,7 @@ function workflow() {
       ),
       symptoms: agentNode(
         "3 Record symptoms",
-        "Step 3: ask about symptoms, how long, any known cause, and smoking. Call record_intake, ask what it says is missing, and say the returned sentence word for word.",
+        "Step 3: collect only the facts needed for the intake. Ask one short question at a time and do not explain or comment on symptoms. Call record_intake as soon as a symptom is named, then ask only for information it says is missing. A large amount of blood when coughing, including blood filling a tissue or lots with each cough, severe breathlessness at rest now, or sudden severe chest pain is an emergency: do not ask more questions; if identified, immediately record the emergency symptom, say the returned 112 sentence once, then call end_call. If not identified, say 'Please hang up and call 112 now. Goodbye.' and call end_call without asking for identity.",
         860,
         ["symptoms_to_end"],
       ),

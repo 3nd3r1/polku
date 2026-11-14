@@ -29,7 +29,7 @@ export type Smoking = z.infer<typeof Smoking>;
 /** One symptom as extracted by the LLM, tied to the caller's own words. */
 export const Observation = z.object({
   code: SymptomCode.describe(
-    "Symptom code. HAEMOPTYSIS_REPEATED = blood in sputum more than once. Use HAEMOPTYSIS_MASSIVE, DYSPNOEA_SEVERE or CHEST_PAIN_ACUTE_SEVERE only for heavy bleeding, breathlessness at rest right now, or sudden severe chest pain.",
+    "Symptom code. HAEMOPTYSIS_REPEATED = blood in sputum more than once. HAEMOPTYSIS_MASSIVE means a large amount of blood, including blood filling a tissue or lots of blood with each cough. DYSPNOEA_SEVERE means severe breathlessness at rest right now. CHEST_PAIN_ACUTE_SEVERE means sudden severe chest pain. These are emergencies: do not ask more questions; tell the caller to hang up and call 112 now.",
   ),
   durationDays: z
     .number()
