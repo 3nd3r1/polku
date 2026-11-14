@@ -67,7 +67,12 @@ export const CAPABILITIES = z.array(Capability).parse([
 
 /** Weekly session template per capability. Synthetic. */
 const TEMPLATE: Record<string, Pick<Resource, "name" | "weekdays" | "times">> = {
-  ct: { name: "CT scanner", weekdays: [1, 2, 3, 4, 5], times: ["08:00", "10:30", "13:00", "15:30"] },
+  // A CT scanner runs all day: a slot every 30 minutes, 08:00-15:30.
+  ct: {
+    name: "CT scanner",
+    weekdays: [1, 2, 3, 4, 5],
+    times: Array.from({ length: 16 }, (_, i) => `${String(8 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`),
+  },
   referral_review: { name: "Referral desk", weekdays: [1, 2, 3, 4, 5], times: ["09:00", "14:00"] },
   pulmonology: { name: "Pulmonology clinic", weekdays: [1, 2, 3, 4], times: ["08:30", "10:00", "13:15", "14:45"] },
   bronchoscopy: { name: "Bronchoscopy unit", weekdays: [2, 4], times: ["08:30", "11:00"] },
@@ -76,7 +81,7 @@ const TEMPLATE: Record<string, Pick<Resource, "name" | "weekdays" | "times">> = 
 };
 
 const DEFAULT_LEAD: Record<string, number> = {
-  ct: 7,
+  ct: 2,
   referral_review: 1,
   pulmonology: 8,
   bronchoscopy: 14,
@@ -90,7 +95,7 @@ const LEAD: Record<string, Partial<Record<string, { days: number; anchor?: strin
     pulmonology: { days: 4, anchor: "Pirha lung pathway (docs/lung-pathway-sources.md, FI-PIRHA)" },
   },
   "keski-suomi": {
-    ct: { days: 9 },
+    ct: { days: 3 },
     pulmonology: { days: 26, anchor: "Keski-Suomi: visit 'noin kuukauden sisällä lähetteen saapumisesta' (docs/lung-pathway-sources.md, FI-KS)" },
   },
 };

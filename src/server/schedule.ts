@@ -17,7 +17,7 @@ import { logRecord } from "./record";
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const PROPOSE = 2;
+const PROPOSE = 3;
 const step = (id: string) => lung.steps.find((s) => s.id === id)!;
 
 export type SessionState = "past" | "taken" | "free" | "offered" | "booked";
