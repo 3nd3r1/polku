@@ -9,7 +9,8 @@ import { type NextRequest, NextResponse } from "next/server";
  *
  * /api/admin/reset is left out: it carries its own bearer token in the same
  * header and checks it itself. So is /api/phone: ElevenLabs calls it with its
- * own secret header (PHONE_WEBHOOK_SECRET).
+ * own secret header (PHONE_WEBHOOK_SECRET), and so is /api/llm, the phone
+ * agent's model proxy, with the same secret as a bearer token.
  */
 export function proxy(request: NextRequest) {
   const password = process.env.SITE_PASSWORD;
@@ -28,4 +29,4 @@ export function proxy(request: NextRequest) {
   });
 }
 
-export const config = { matcher: ["/((?!api/admin/reset|api/phone/).*)"] };
+export const config = { matcher: ["/((?!api/admin/reset|api/phone/|api/llm/).*)"] };

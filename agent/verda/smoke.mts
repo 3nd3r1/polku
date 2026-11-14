@@ -27,7 +27,7 @@ async function turn(label: string, messages: Msg[]): Promise<{ text: string; cal
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemma-3-12b-it",
+      model: process.env.SMOKE_MODEL ?? "google/gemma-3-12b-it",
       messages: [{ role: "system", content: system }, ...messages],
       tools,
       stream: true,

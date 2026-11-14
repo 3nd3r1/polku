@@ -86,6 +86,26 @@ type Agent = {
 const web = await api<Agent>("GET", `/agents/${webAgentId}`);
 web.conversation_config.agent.prompt.tool_ids = AGENT_TOOLS.map((t) => ids.tools[t.name]);
 delete web.conversation_config.agent.prompt.tools; // the GET returns both; create accepts one
+
+// Model: our proxy (/api/llm), which forwards each turn to Qwen3 on Verda and writes the
+// transcript live. The proxy's bearer token is PHONE_WEBHOOK_SECRET, held as a workspace secret.
+// If the proxy is slow or down, ElevenLabs falls back to Gemini for that turn.
+const secrets = await api<{ secrets: { secret_id: string; name: string }[] }>("GET", "/secrets");
+const secretId =
+  secrets.secrets.find((s) => s.name === "polku_llm_proxy")?.secret_id ??
+  (await api<{ secret_id: string }>("POST", "/secrets", { type: "new", name: "polku_llm_proxy", value: secret })).secret_id;
+Object.assign(web.conversation_config.agent.prompt, {
+  llm: "custom-llm",
+  custom_llm: {
+    url: `${BASE}/api/llm`,
+    model_id: "qwen3",
+    api_key: { secret_id: secretId },
+    request_headers: { "x-polku-conversation": { variable_name: "system__conversation_id" } },
+    api_version: null,
+    api_type: "chat_completions",
+  },
+  backup_llm_config: { preference: "override", order: ["gemini-3.5-flash"] },
+});
 const agent = {
   name: "Polku Phone",
   conversation_config: web.conversation_config,
