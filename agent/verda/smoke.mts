@@ -32,7 +32,7 @@ async function turn(label: string, messages: Msg[]): Promise<{ text: string; cal
       tools,
       stream: true,
       max_tokens: 400,
-      temperature: Number(process.env.TEMP ?? 0),
+      temperature: Number(process.env.SMOKE_TEMPERATURE ?? 0),
     }),
   });
   if (!res.ok || !res.body) {

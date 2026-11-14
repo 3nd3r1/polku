@@ -1,5 +1,5 @@
 {
-    "description": "After identification: returns the caller's own open case and the sentence to tell them, or says they have none. Takes no parameters.",
+    "description": "Looks up the identified caller's own open case again. Not needed right after verify_identity, which already returns it. Takes no parameters.",
     "dynamic_variables": {
         "dynamic_variable_placeholders": {}
     },

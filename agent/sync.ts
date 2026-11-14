@@ -7,6 +7,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AGENT_TOOLS, FIRST_MESSAGE, toElevenLabs } from "../src/server/agent-tools";
 
+/** Which model runs the conversation. Flip to "gemini" and run `npm run agent:push` to switch back. */
+const LLM: "gemma" | "gemini" = "gemma";
+
 const dir = join(import.meta.dirname, ".");
 const readJson = (f: string) => JSON.parse(readFileSync(join(dir, f), "utf8"));
 const writeJson = (f: string, v: unknown) => writeFileSync(join(dir, f), `${JSON.stringify(v, null, 4)}\n`);
@@ -52,6 +55,24 @@ a.prompt.built_in_tools.end_call = {
   tool_error_handling_mode: "auto",
   type: "system",
 };
+// The agent's LLM. "gemma" is Gemma 3 on Verda (EU, our own endpoint, see agent/verda/); "gemini" is ElevenLabs-hosted.
+if (LLM === "gemma") {
+  a.prompt.llm = "custom-llm";
+  a.prompt.custom_llm = {
+    url: "https://containers.datacrunch.io/polku-gemma-3/v1",
+    model_id: "google/gemma-3-12b-it",
+    api_key: { secret_id: "EfaPxevvJYzy6LqgGJi2" }, // workspace secret verda_inference_key (an id, not the key)
+    request_headers: {},
+    api_version: null,
+    api_type: "chat_completions",
+  };
+  // If the endpoint is down or slower than cascade_timeout_seconds, the call falls back to Gemini.
+  a.prompt.backup_llm_config = { preference: "override", order: ["gemini-3.5-flash"] };
+} else {
+  a.prompt.llm = "gemini-3.5-flash";
+  a.prompt.custom_llm = null;
+  a.prompt.backup_llm_config = { preference: "default" };
+}
 config.conversation_config.tts.suggested_audio_tags = [];
 config.tags = ["polku"];
 config.workflow = workflow();

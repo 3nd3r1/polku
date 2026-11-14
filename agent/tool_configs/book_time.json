@@ -1,5 +1,5 @@
 {
-    "description": "After get_case has read out numbered times: book the one the caller chose. Option 0 means none of the times suits. Returns the sentence to say.",
+    "description": "After numbered times have been read out: book the one the caller chose. Option 0 means none of the times suits. Returns the sentence to say.",
     "dynamic_variables": {
         "dynamic_variable_placeholders": {}
     },

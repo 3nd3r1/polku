@@ -6,7 +6,7 @@ import { makeHetu } from "../ontology/hetu";
 import type { Intake } from "../ontology/schema";
 import type { Person } from "../sim/people";
 import { startCall } from "./calls";
-import { getCase, submitIntake } from "./cases";
+import { getCase, identify, submitIntake } from "./cases";
 import { MAX_FAILED_VERIFICATIONS, verifyIdentity } from "./identity";
 
 /**
@@ -70,6 +70,22 @@ describe.skipIf(!process.env.DATABASE_URL)("access gate", () => {
     expect(r.sayThis).not.toContain(A.hetu);
     expect(r.sayThis).not.toContain("Alfa");
     await expect(verifyIdentity(call, B.hetu)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("identification returns the caller's own case in the same reply, and logs both steps", async () => {
+    const call = await newCall();
+    const r = await identify(call, B.hetu);
+    expect(r.sayThis).toContain("Testi,");
+    expect(r.sayThis).toContain("The caller has no open case.");
+    expect(r.sayThis).not.toContain(B.hetu);
+    expect((await log(call)).map((x) => [x.tool, x.allowed])).toEqual([
+      ["verify_identity", true],
+      ["get_case", true],
+    ]);
+    // A failed identification returns nothing about any case.
+    const bad = await newCall();
+    await expect(identify(bad, "131052-308T")).rejects.toMatchObject({ status: 422 });
+    expect((await log(bad)).map((x) => x.tool)).toEqual(["verify_identity"]);
   });
 
   it("gives each caller only their own case", async () => {
