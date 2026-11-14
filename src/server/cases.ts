@@ -10,7 +10,7 @@ import { lung } from "../pathways/lung";
 import { ageOf, type Person } from "../sim/people";
 import { publishChange } from "./bus";
 import { ActionError } from "./errors";
-import { logAccess, refuse, requireIdentified } from "./identity";
+import { logAccess, refuse, requireIdentified, verifyIdentity } from "./identity";
 import { logRecord } from "./record";
 
 export { ActionError };
@@ -93,6 +93,17 @@ export async function getCase(callId: string) {
     summary,
     sayThis: `The caller has an open case. Tell them: "${summary}" Then ask whether anything is new or worse. If so, collect it and call record_intake.`,
   };
+}
+
+/**
+ * The verify_identity tool: identification, then the caller's own case in the
+ * same reply. One tool call instead of two in a row, which small open models
+ * get wrong (they answer from imagination instead of calling get_case).
+ */
+export async function identify(callId: string, spokenHetu: string) {
+  const who = await verifyIdentity(callId, spokenHetu);
+  const theirCase = await getCase(callId);
+  return { sayThis: `${who.sayThis} Their case is already looked up, so do not call get_case now. ${theirCase.sayThis}` };
 }
 
 /** The caller has times waiting to be picked: read them as numbered options. */

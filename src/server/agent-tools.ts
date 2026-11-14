@@ -22,7 +22,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     name: "verify_identity",
     description:
-      "Strongly identify the caller. Call this first, with the personal identity code (henkilötunnus) the caller says. The server confirms it with Mobile ID. Nothing about the caller is available before this succeeds.",
+      "Strongly identify the caller. Call this first, with the personal identity code (henkilötunnus) the caller says. The server confirms it with Mobile ID and returns who the caller is and their own open case, if they have one. Nothing about the caller is available before this succeeds.",
     parameters: {
       type: "object",
       properties: {
@@ -37,7 +37,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     name: "get_case",
     description:
-      "After identification: returns the caller's own open case and the sentence to tell them, or says they have none. Takes no parameters.",
+      "Looks up the identified caller's own open case again. Not needed right after verify_identity, which already returns it. Takes no parameters.",
     parameters: { type: "object", properties: {} },
   },
   {
@@ -49,7 +49,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     name: "book_time",
     description:
-      "After get_case has read out numbered times: book the one the caller chose. Option 0 means none of the times suits. Returns the sentence to say.",
+      "After numbered times have been read out: book the one the caller chose. Option 0 means none of the times suits. Returns the sentence to say.",
     parameters: {
       type: "object",
       properties: {

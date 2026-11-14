@@ -128,6 +128,6 @@ export async function verifyIdentity(callId: string, spokenHetu: string) {
   const firstName = person.name.split(" ")[0];
   return {
     // Only what the conversation needs. Never the identity code, never the full name.
-    sayThis: `Identity confirmed with Mobile ID. The caller is ${firstName}, ${ageOf(person)} years old, from ${person.county}. Greet them by first name and do not ask their age. Then call get_case.`,
+    sayThis: `Identity confirmed with Mobile ID. The caller is ${firstName}, ${ageOf(person)} years old, from ${person.county}. Greet them by first name and do not ask their age.`,
   };
 }

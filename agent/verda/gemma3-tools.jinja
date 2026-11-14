@@ -1,0 +1,83 @@
+{#- Gemma 3 chat template for vLLM with pythonic tool calls.
+    Based on vLLM examples/tool_chat_template_gemma3_pythonic.jinja, changed for ElevenLabs:
+    no strict user/assistant alternation (the agent speaks first), null content allowed. ASCII only. -#}
+{{- bos_token -}}
+{%- if messages[0]['role'] == 'system' -%}
+    {%- if messages[0]['content'] is string -%}
+        {%- set sys = messages[0]['content'] + '\n\n' -%}
+    {%- else -%}
+        {%- set sys = messages[0]['content'][0]['text'] + '\n\n' -%}
+    {%- endif -%}
+    {%- set loop_messages = messages[1:] -%}
+{%- else -%}
+    {%- set sys = '' -%}
+    {%- set loop_messages = messages -%}
+{%- endif -%}
+{%- if not tools is defined -%}
+    {%- set tools = none -%}
+{%- endif -%}
+{%- set lead = (loop_messages | length == 0) or (loop_messages[0]['role'] != 'user') -%}
+{%- macro prefix() -%}
+    {{- sys -}}
+    {%- if tools is not none -%}
+        {{- 'Tools (functions) are available. If you decide to invoke one or more of the tools, you must respond with a python list of the function calls.\n' -}}
+        {{- 'Example Format: [func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)] \n' -}}
+        {{- 'Do not use variables. DO NOT USE MARKDOWN SYNTAX. You SHOULD NOT include any other text in the response if you call a function. If you lack the parameters required by the function, ask the caller for them instead.\n' -}}
+        {{- 'Here is a list of functions in JSON format that you can invoke.\n' -}}
+        {{- tools | tojson(indent=4) -}}
+        {{- '\n\n' -}}
+    {%- endif -%}
+{%- endmacro -%}
+{%- if lead -%}
+    {{- '<start_of_turn>user\n' + prefix() + '(The call is connected.)<end_of_turn>\n' -}}
+{%- endif -%}
+{%- for message in loop_messages -%}
+    {%- if message['role'] == 'assistant' -%}
+        {%- set role = 'model' -%}
+    {%- else -%}
+        {%- set role = 'user' -%}
+    {%- endif -%}
+    {{- '<start_of_turn>' + role + '\n' -}}
+    {%- if loop.first and not lead -%}
+        {{- prefix() -}}
+    {%- endif -%}
+    {%- if message['tool_calls'] is defined and message['tool_calls'] -%}
+        {{- '[' -}}
+        {%- for tool_call in message['tool_calls'] -%}
+            {%- if tool_call.function is defined -%}
+                {%- set tool_call = tool_call.function -%}
+            {%- endif -%}
+            {{- tool_call.name + '(' -}}
+            {%- if tool_call.arguments is mapping -%}
+                {%- for key, val in tool_call.arguments.items() -%}
+                    {{- key + '=' + (val | tojson) -}}
+                    {%- if not loop.last -%}{{- ', ' -}}{%- endif -%}
+                {%- endfor -%}
+            {%- elif tool_call.arguments is string -%}
+                {{- tool_call.arguments -}}
+            {%- endif -%}
+            {{- ')' -}}
+            {%- if not loop.last -%}{{- ', ' -}}{%- endif -%}
+        {%- endfor -%}
+        {{- ']' -}}
+    {%- endif -%}
+    {%- if message['role'] == 'tool' -%}
+        {{- '<tool_response>\n' -}}
+    {%- endif -%}
+    {%- if message['content'] is string -%}
+        {{- message['content'] | trim -}}
+    {%- elif message['content'] is iterable -%}
+        {%- for item in message['content'] -%}
+            {%- if item['type'] == 'text' -%}
+                {{- item['text'] | trim -}}
+            {%- endif -%}
+        {%- endfor -%}
+    {%- endif -%}
+    {%- if message['role'] == 'tool' -%}
+        {{- '</tool_response>' -}}
+    {%- endif -%}
+    {{- '<end_of_turn>\n' -}}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+    {{- '<start_of_turn>model\n' -}}
+{%- endif -%}

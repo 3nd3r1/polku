@@ -231,7 +231,7 @@ export async function bookTime(callId: string, option: number) {
         .where(and(eq(clocks.caseId, c.id), isNull(clocks.stoppedAt)))
     : [];
   if (!c || c.personId !== person.id || !k?.offeredSlots?.length) {
-    throw await refuse(callId, tool, "No times proposed to this caller", "There are no times to book for this caller. Call get_case first.", 409);
+    throw await refuse(callId, tool, "No times proposed to this caller", "There are no times to book for this caller. Call get_case to check their case.", 409);
   }
   const slots = k.offeredSlots;
   if (!Number.isInteger(option) || option < 0 || option > slots.length) {
