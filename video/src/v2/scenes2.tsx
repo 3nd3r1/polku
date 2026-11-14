@@ -15,7 +15,7 @@ export const FACTS2 = {
   heroSource: "Yle MOT, yle.fi/a/74-20251023",
 };
 
-const GREETING = "Hi, this is Polku, the lung symptom line. I'm an AI assistant. To identify you, please tell me your personal identity code.";
+const GREETING = "Hi, this is Polku, the lung symptom line. I'm an AI assistant. What's your identity code?";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
@@ -91,7 +91,7 @@ const A_TableDrawn: React.FC = () => {
       <Subtitle from={s(1.0)} to={s(3.0)} text="*coughs*" />
       <Subtitle
         from={s(3.4)}
-        to={s(8.6)}
+        to={s(8.5)}
         speaker="Matti"
         text="Ei se varmaan mitään ole. En viitsi vaivata ketään."
         sub="It's probably nothing. I don't want to bother anyone."
@@ -165,7 +165,7 @@ export const C_Dial: React.FC = () => {
         </Phone>
       </Appear>
       {people && <DialFootage until={answered} />}
-      <Subtitle from={s(3.8)} to={s(8)} speaker="Polku / AI agent" text={GREETING} bottom={110} />
+      <Subtitle from={s(3.7)} to={s(8)} speaker="Polku / AI agent" text={GREETING} bottom={110} />
     </AbsoluteFill>
   );
 };
@@ -175,16 +175,17 @@ export const C_Dial: React.FC = () => {
 /* Words fly from the subtitle into the symptom they become.            */
 /* ------------------------------------------------------------------ */
 type Say = { from: number; to: number; who: "agent" | "caller"; text: string };
+// Timed to the generated voice lines (src/v2/audio.ts): start, then length + 0.2 s.
 const SAYS: Say[] = [
-  { from: s(0.2), to: s(2.4), who: "caller", text: "It's 040355-9018." },
-  { from: s(4.6), to: s(6.8), who: "agent", text: "Thank you, Matti. You're identified." },
-  { from: s(7.0), to: s(9.2), who: "agent", text: "What symptoms have you been having?" },
-  { from: s(9.5), to: s(14.6), who: "caller", text: "I've had this cough for about seven weeks now. It just won't go away." },
-  { from: s(15.0), to: s(18.2), who: "agent", text: "Did it start after a cold, or anything else you know of?" },
-  { from: s(18.5), to: s(20.8), who: "caller", text: "No, nothing like that." },
-  { from: s(21.2), to: s(23.6), who: "agent", text: "Do you smoke, or have you smoked before?" },
-  { from: s(24.0), to: s(27.0), who: "caller", text: "I quit about ten years ago." },
-  { from: s(31.0), to: s(34.8), who: "agent", text: "Thank you. I have what I need." },
+  { from: s(1.2), to: s(6.0), who: "caller", text: "It's 040355-9018." },
+  { from: s(7.6), to: s(10.0), who: "agent", text: "Thank you, Matti. You're identified." },
+  { from: s(10.1), to: s(12.1), who: "agent", text: "What symptoms have you been having?" },
+  { from: s(12.2), to: s(17.3), who: "caller", text: "I've had this cough for about seven weeks now. It just won't go away." },
+  { from: s(17.4), to: s(20.5), who: "agent", text: "Did it start after a cold, or anything else you know of?" },
+  { from: s(20.6), to: s(23.2), who: "caller", text: "No, nothing like that." },
+  { from: s(23.4), to: s(26.0), who: "agent", text: "Do you smoke, or have you smoked before?" },
+  { from: s(26.1), to: s(28.7), who: "caller", text: "I quit about ten years ago." },
+  { from: s(32.4), to: s(34.4), who: "agent", text: "Thank you. I have what I need." },
 ];
 
 /** A phrase that leaves the subtitle and lands in the Screening panel. */
@@ -224,13 +225,13 @@ export const D_Call: React.FC = () => {
   const f = useCurrentFrame();
   const people = usePeople();
   const say = SAYS.find((x) => f >= x.from && f < x.to);
-  const verifyAt = s(1.4);
-  const verifiedAt = s(3.6);
-  const coughAt = s(12.6) + 14;
-  const unexplainedAt = s(19.6);
-  const smokeAt = s(25.4) + 14;
-  const ruleAt = s(27.6);
-  const matchAt = s(30.2);
+  const verifyAt = s(6.0);
+  const verifiedAt = s(7.4);
+  const coughAt = s(14.6) + 14;
+  const unexplainedAt = s(21.6);
+  const smokeAt = s(26.9) + 14;
+  const ruleAt = s(29.0);
+  const matchAt = s(31.0);
   const secs = 8 + Math.floor(f / FPS);
   return (
     <Frame section="Screening / live call / synthetic person">
@@ -360,9 +361,9 @@ export const D_Call: React.FC = () => {
         </div>
       </div>
 
-      <Fly at={s(12.6)} text="cough for about seven weeks" from={[300, 900]} to={[1100, 385]} />
-      <Fly at={s(19.6)} text="nothing like that" from={[260, 880]} to={[1480, 385]} />
-      <Fly at={s(25.4)} text="I quit about ten years ago" from={[96, 880]} to={[1100, 460]} />
+      <Fly at={s(14.6)} text="cough for about seven weeks" from={[300, 900]} to={[1100, 385]} />
+      <Fly at={s(21.6)} text="nothing like that" from={[260, 880]} to={[1480, 385]} />
+      <Fly at={s(26.9)} text="I quit about ten years ago" from={[96, 880]} to={[1100, 460]} />
     </Frame>
   );
 };
@@ -370,7 +371,7 @@ export const D_Call: React.FC = () => {
 /* ------------------------------------------------------------------ */
 /* 1:05-1:12  Hold on the promise. Countdown starts. 2 s of silence.    */
 /* ------------------------------------------------------------------ */
-export const PROMISE_CLOCK_START = s(2.2);
+export const PROMISE_CLOCK_START = s(3.5);
 
 export const E_Promise: React.FC = () => (usePeople() ? <E_PromisePeople clockStart={PROMISE_CLOCK_START} /> : <E_PromiseDrawn />);
 
@@ -390,7 +391,7 @@ const E_PromiseDrawn: React.FC = () => {
         </Label>
         <div style={{ fontSize: 100, fontWeight: 300, lineHeight: 1.1, maxWidth: 1700 }}>
           {words.map((w, i) => {
-            const at = s(0.1) + i * 4;
+            const at = s(0.1) + i * 10;
             const o = interpolate(f, [at, at + 5], [0, 1], clamp);
             return (
               <span key={i} style={{ opacity: o }}>
@@ -534,7 +535,7 @@ export const F_Nurse: React.FC = () => {
           })}
         </div>
       </div>
-      <Subtitle from={s(8.4)} to={s(12.8)} speaker="Voice-over" text="A nurse decides. Every step after that is a promise with a deadline." bottom={150} />
+      <Subtitle from={s(8.2)} to={s(12.95)} speaker="Voice-over" text="A nurse decides. Every step after that is a promise with a deadline." bottom={150} />
     </Frame>
   );
 };
@@ -560,7 +561,7 @@ export const G_112: React.FC = () => {
           <span style={{ fontFamily: MONO, fontSize: 18, color: C.muted }}>RF-112 / enforced in the engine, not the prompt</span>
         </div>
       </AbsoluteFill>
-      <Subtitle from={s(1.8)} to={s(6.8)} speaker="Voice-over" text="The AI never decides. Some rules it cannot override." bottom={120} />
+      <Subtitle from={s(1.6)} to={s(5.5)} speaker="Voice-over" text="The AI never decides. Some rules it cannot override." bottom={120} />
     </AbsoluteFill>
   );
 };
@@ -678,8 +679,8 @@ export const H_Map: React.FC = () => {
           ))}
         </div>
       )}
-      <Subtitle from={s(0.8)} to={s(4.4)} speaker="Voice-over" text="Today Finland cannot measure this per county." bottom={150} />
-      <Subtitle from={s(4.8)} to={s(8.2)} speaker="Voice-over" text="With Polku it is a by-product of care." bottom={150} />
+      <Subtitle from={s(0.8)} to={s(4.0)} speaker="Voice-over" text="Today Finland cannot measure this per county." bottom={150} />
+      <Subtitle from={s(4.8)} to={s(7.9)} speaker="Voice-over" text="With Polku it is a by-product of care." bottom={150} />
     </Frame>
   );
 };
@@ -726,7 +727,7 @@ export const I_Code: React.FC = () => {
           open · cited · runs in Europe
         </Label>
       </Appear>
-      <Subtitle from={s(1.6)} to={s(5.8)} speaker="Voice-over" text="One typed, cited definition per cancer. A sovereign ontology." bottom={120} />
+      <Subtitle from={s(0.7)} to={s(5.6)} speaker="Voice-over" text="One typed, cited definition per cancer. A sovereign ontology." bottom={120} />
     </AbsoluteFill>
   );
 };
@@ -743,7 +744,7 @@ export const J_Logo: React.FC = () => {
       <Appear at={s(0.5)} dur={8} style={{ marginTop: 60 }}>
         <div style={{ fontSize: 62, fontWeight: 300 }}>Every cancer pathway, on the clock.</div>
       </Appear>
-      <Subtitle from={s(1.0)} to={s(4.9)} speaker="Voice-over" text="By 2028, says the strategy. We built one this weekend." bottom={150} />
+      <Subtitle from={s(0.6)} to={s(4.95)} speaker="Voice-over" text="By 2028, says the strategy. We built one this weekend." bottom={150} />
       <div style={{ position: "absolute", left: 96, bottom: 70 }}>
         <Label size={16}>Junction 2026 / AstraZeneca: Equal Care Across Finland / synthetic data only</Label>
       </div>

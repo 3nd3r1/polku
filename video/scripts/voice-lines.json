@@ -1,0 +1,125 @@
+{
+  "voices": {
+    "narrator": {
+      "id": "Xb7hH8MSUJpSbSDYk0k2",
+      "name": "Alice",
+      "effects": {}
+    },
+    "agent": {
+      "id": "EXAVITQu4vr4xnSDxMaL",
+      "name": "Sarah",
+      "effects": {
+        "filter-preset-id": "phone"
+      }
+    },
+    "matti": {
+      "id": "pqHfZKP75CvOlQylNhV4",
+      "name": "Bill",
+      "effects": {
+        "environment-id": "small_room"
+      }
+    },
+    "matti_fi": {
+      "id": "JMfkzZiSsox62UXcXUqM",
+      "name": "Jaakko",
+      "lang": "fi",
+      "effects": {
+        "environment-id": "small_room"
+      }
+    }
+  },
+  "lines": [
+    {
+      "id": "a-matti-fi",
+      "voice": "matti_fi",
+      "text": "Ei se varmaan mitään ole... En viitsi vaivata ketään."
+    },
+    {
+      "id": "c-agent-greet",
+      "voice": "agent",
+      "text": "Hi, this is Polku, the lung symptom line. I'm an AI assistant. What's your identity code?"
+    },
+    {
+      "id": "d-matti-1",
+      "voice": "matti",
+      "text": "It's zero four zero three five five, nine zero one eight.",
+      "speed": 1.15
+    },
+    {
+      "id": "d-agent-1",
+      "voice": "agent",
+      "text": "Thank you, Matti. You're identified."
+    },
+    {
+      "id": "d-agent-2",
+      "voice": "agent",
+      "text": "What symptoms have you been having?"
+    },
+    {
+      "id": "d-matti-2",
+      "voice": "matti",
+      "text": "I've had this cough for about seven weeks now. It just won't go away."
+    },
+    {
+      "id": "d-agent-3",
+      "voice": "agent",
+      "text": "Did it start after a cold, or anything else you know of?"
+    },
+    {
+      "id": "d-matti-3",
+      "voice": "matti",
+      "text": "No. Nothing like that."
+    },
+    {
+      "id": "d-agent-4",
+      "voice": "agent",
+      "text": "Do you smoke, or have you smoked before?"
+    },
+    {
+      "id": "d-matti-4",
+      "voice": "matti",
+      "text": "I quit about ten years ago."
+    },
+    {
+      "id": "d-agent-5",
+      "voice": "agent",
+      "text": "Thank you. I have what I need."
+    },
+    {
+      "id": "e-agent-promise",
+      "voice": "agent",
+      "text": "A nurse will call you by Sunday, twenty-one forty-seven."
+    },
+    {
+      "id": "f-vo",
+      "voice": "narrator",
+      "text": "A nurse decides. Every step after that is a promise with a deadline."
+    },
+    {
+      "id": "g-vo",
+      "voice": "narrator",
+      "text": "The AI never decides. Some rules it cannot override."
+    },
+    {
+      "id": "h-vo-1",
+      "voice": "narrator",
+      "text": "Today, Finland cannot measure this per county."
+    },
+    {
+      "id": "h-vo-2",
+      "voice": "narrator",
+      "text": "With Polku, it is a by-product of care."
+    },
+    {
+      "id": "i-vo",
+      "voice": "narrator",
+      "text": "One typed, cited definition per cancer. A sovereign ontology."
+    },
+    {
+      "id": "j-vo",
+      "voice": "narrator",
+      "text": "By 2028, says the strategy. We built one this weekend.",
+      "speed": 1.12
+    }
+  ]
+}

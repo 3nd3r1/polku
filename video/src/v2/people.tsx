@@ -68,7 +68,7 @@ export const A_TablePeople: React.FC = () => {
       </div>
       <Subtitle
         from={s(5.2)}
-        to={s(10.6)}
+        to={s(10.3)}
         speaker="Matti"
         text="Ei se varmaan mitään ole. En viitsi vaivata ketään."
         sub="It's probably nothing. I don't want to bother anyone."
@@ -148,7 +148,7 @@ export const E_PromisePeople: React.FC<{ clockStart: number }> = ({ clockStart }
         </Label>
         <div style={{ fontSize: 80, fontWeight: 300, lineHeight: 1.12 }}>
           {words.map((w, i) => {
-            const at = s(0.1) + i * 4;
+            const at = s(0.1) + i * 10;
             return (
               <span key={i} style={{ opacity: interpolate(f, [at, at + 5], [0, 1], clamp) }}>
                 {w}{" "}
