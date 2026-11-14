@@ -16,7 +16,18 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Polku",
-  description: "Polku does the handoffs between cancer care steps. Prototype with synthetic data.",
+  description: "A phone line for suspected lung cancer. A clock on every step.",
+  openGraph: {
+    title: "Every cancer pathway, on the clock.",
+    description: "A phone line for suspected lung cancer. A clock on every step.",
+    images: [{ url: "/opengraph-image.png", width: 1200, height: 630, alt: "Polku: Every cancer pathway, on the clock." }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Every cancer pathway, on the clock.",
+    description: "A phone line for suspected lung cancer. A clock on every step.",
+    images: ["/twitter-image.png"],
+  },
   // Tell the Dark Reader extension the page is already dark.
   other: { "darkreader-lock": "" },
 };

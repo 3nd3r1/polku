@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { usePhone } from "./agent-call";
 
@@ -26,10 +27,9 @@ export function Nav() {
   );
   return (
     <nav className="flex h-12 shrink-0 items-center gap-8 border-b border-line bg-panel px-6">
-      <span className="flex items-center gap-2.5 text-sm font-semibold tracking-[0.2em]">
-        <span className="block h-3 w-3 bg-fg" aria-hidden />
-        POLKU
-      </span>
+      <Link href="/" aria-label="Polku home" className="flex shrink-0 items-center">
+        <Image src="/polku-lockup.svg" alt="Polku" width={94} height={16} />
+      </Link>
       <div className="flex h-full">{TABS.map((t) => tab(t.href, t.label))}</div>
       <div className="ml-auto flex h-full items-center gap-6">
         {phone.live && (
