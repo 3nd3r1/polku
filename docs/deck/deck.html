@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Polku</title>
+<style>
+@font-face{font-family:Geist;src:url(../../node_modules/next/dist/next-devtools/server/font/geist-latin.woff2) format("woff2");font-weight:100 900}
+@font-face{font-family:GeistMono;src:url(../../node_modules/next/dist/next-devtools/server/font/geist-mono-latin.woff2) format("woff2");font-weight:100 900}
+:root{--base:#0a0b0b;--panel:#121414;--line:#262a2b;--strong:#3a3f41;--fg:#e6e6e3;--muted:#8d9294;--dim:#5b6062;--info:#5b9bd5}
+@page{size:960pt 540pt;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--base);color:var(--fg);font-family:Geist,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+a{color:inherit;text-decoration:none}
+.s{position:relative;width:960pt;height:540pt;overflow:hidden;page-break-after:always;background:var(--base)}
+.s.bg{background:var(--base) url(../../brand/kit/backgrounds/polku-bg-path-dimmed-1920x1080.png) center/cover}
+.logo{position:absolute;left:48pt;top:36pt;height:12pt}
+.foot{position:absolute;left:48pt;right:48pt;bottom:30pt;display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);padding-top:10pt}
+.lab{font-family:GeistMono,monospace;font-size:8pt;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.src{font-size:8pt;color:var(--muted)}
+.src a{color:var(--info)}
+.body{position:absolute;left:48pt;right:48pt;top:96pt}
+h1{font-weight:300;font-size:40pt;line-height:1.12;letter-spacing:-.01em}
+h1 .m{color:var(--muted)}
+.lead{margin-top:16pt;font-size:14pt;line-height:1.45;color:var(--muted);max-width:620pt}
+.huge{font-weight:300;font-size:120pt;line-height:1;letter-spacing:-.03em}
+.big{font-weight:300;font-size:64pt;line-height:1;letter-spacing:-.02em}
+.cap{margin-top:10pt;font-size:13pt;line-height:1.4;color:var(--muted)}
+/* pathway line */
+.path{position:absolute;left:48pt;right:48pt;height:1pt;background:var(--fg)}
+.node{position:absolute;width:8pt;height:8pt;margin:-3.5pt 0 0 -4pt;background:var(--fg)}
+.node.open{background:var(--base);border:1pt solid var(--fg)}
+.steps{position:absolute;left:48pt;right:48pt;display:grid}
+.steps div{font-size:12pt;line-height:1.35;padding-right:16pt}
+.steps .who{display:block;margin-top:6pt;font-size:10pt;color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:32pt}
+.col{border-top:1px solid var(--strong);padding-top:16pt}
+.col h2{font-weight:400;font-size:28pt}
+.col p{margin-top:8pt;font-size:13pt;line-height:1.45;color:var(--muted)}
+</style></head><body>
+
+<!-- 1 -->
+<section class="s bg">
+  <img class="logo" src="../../brand/kit/logo/svg/polku-lockup.svg" style="height:16pt;top:40pt">
+  <div class="body" style="top:150pt">
+    <h1 style="font-size:56pt">Every cancer pathway,<br>on the clock.</h1>
+    <p class="lead">A phone line for suspected lung cancer. Polku does the handoffs between care steps.</p>
+  </div>
+  <div class="foot"><span class="lab">Junction 2026 / AstraZeneca / Equal care across Finland</span><span class="lab">Espoo 13-15.11.2026</span></div>
+</section>
+
+<!-- 2 -->
+<section class="s">
+  <img class="logo" src="../../brand/kit/logo/svg/polku-lockup.svg">
+  <div class="body" style="top:150pt;display:flex;justify-content:space-between;align-items:flex-end">
+    <h1 style="font-size:48pt">Matti is 71.<br><span class="m">He has been coughing<br>for seven weeks.</span></h1>
+    <div style="text-align:right"><div class="huge">49</div><div class="cap">days, and no one has called him</div></div>
+  </div>
+  <div class="foot"><span class="lab">02 / The patient</span><span class="src">Illustrative patient. SYNTHETIC.</span></div>
+</section>
+
+<!-- 3 -->
+<section class="s">
+  <img class="logo" src="../../brand/kit/logo/svg/polku-lockup.svg">
+  <div class="body">
+    <h1>Found late. <span class="m">And nobody counts the wait.</span></h1>
+    <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:56pt;gap:48pt">
+      <div class="col"><div class="big">65-70 %</div><p>of lung cancers in Finland are found at an advanced stage.</p></div>
+      <div class="col"><div class="big">0</div><p>public county series of lung cancer pathway times that we could find. Sweden and Denmark publish theirs per region.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span class="lab">03 / The gap</span><span class="src">REAL. Source: <a href="https://www.filha.fi/wp-content/uploads/2026/05/Valtakunnallinen-keuhkosyopaohjelma-2026-2035_180526_preprint.pdf">Filha lung cancer programme 2026-2035</a> (Knuuttila 2021). Pathway times: our search, no public county series found.</span></div>
+</section>
+
+<!-- 4 -->
+<section class="s">
+  <img class="logo" src="../../brand/kit/logo/svg/polku-lockup.svg">
+  <div class="body"><h1>Care doesn't stall inside the steps.<br><span class="m">It stalls between them.</span></h1></div>
+  <div class="path" style="top:330pt"></div>
+  <div class="node" style="top:330pt;left:48pt"></div>
+  <div class="node" style="top:330pt;left:336pt"></div>
+  <div class="node" style="top:330pt;left:624pt"></div>
+  <div class="node" style="top:330pt;left:912pt"></div>
+  <div class="lab" style="position:absolute;top:302pt;font-size:10pt;left:48pt">Call</div>
+  <div class="lab" style="position:absolute;top:302pt;font-size:10pt;left:336pt;transform:translateX(-50%)">Nurse</div>
+  <div class="lab" style="position:absolute;top:302pt;font-size:10pt;left:624pt;transform:translateX(-50%)">CT</div>
+  <div class="lab" style="position:absolute;top:302pt;font-size:10pt;right:48pt">Pulmonology</div>
+  <div class="steps" style="top:352pt;grid-template-columns:repeat(3,1fr)">
+    <div><span class="big" style="font-size:36pt">2 days</span><span class="who">nurse callback</span></div>
+    <div><span class="big" style="font-size:36pt">1 week</span><span class="who">to CT</span></div>
+    <div><span class="big" style="font-size:36pt">2-3 weeks</span><span class="who">to the first specialist visit</span></div>
+  </div>
+  <div class="foot"><span class="lab">04 / Handoffs</span><span class="src">Sources: <a href="https://www.pirha.fi/asiakkaalle/hoito-ja-palvelupolut/keuhkosyopapotilaan-hoitopolku">pirha.fi</a> · <a href="https://www.hyvaks.fi/asiakkaana/hoitopolut/keuhkosyopapotilaan-hoitopolku">hyvaks.fi</a>. The 2-day callback is a Polku proposal.</span></div>
+</section>
+
+<!-- 5 -->
+<section class="s">
+  <img class="logo" src="../../brand/kit/logo/svg/polku-lockup.svg">
+  <div class="body"><h1>The AI listens.<br><span class="m">The rules decide. The nurse confirms.</span></h1></div>
+  <div class="path" style="top:300pt;right:192pt"></div>
+  <div class="node" style="top:300pt;left:48pt"></div>
+  <div class="node" style="top:300pt;left:192pt"></div>
+  <div class="node" style="top:300pt;left:336pt"></div>
+  <div class="node" style="top:300pt;left:480pt"></div>
+  <div class="node" style="top:300pt;left:624pt"></div>
+  <div class="node" style="top:300pt;left:768pt"></div>
+  <div class="steps" style="top:322pt;grid-template-columns:repeat(6,1fr)">
+    <div>Patient calls the line.</div>
+    <div>Speech becomes typed symptoms.</div>
+    <div>Rules match a published criterion.</div>
+    <div>Nurse accepts a proposed time.</div>
+    <div>Agent calls back and books it.</div>
+    <div>The record moves to the next step.</div>
+  </div>
+  <p class="cap" style="position:absolute;left:48pt;top:420pt">Red flags always mean 112. Nothing before identification. Every access is logged.</p>
+  <div class="foot"><span class="lab">05 / How it works</span><span class="src">Criteria: <a href="https://kunskapsbanken.cancercentrum.se/diagnoser/lungcancer/vardforlopp/">Swedish standardised lung cancer pathway v1.4</a></span></div>
+</section>
+
+<!-- 6 -->
+<section class="s">
+  <img class="logo" src="../../brand/kit/logo/svg/polku-lockup.svg">
+  <div class="body">
+    <h1>Three partners. <span class="m">Three jobs.</span></h1>
+    <div class="cols" style="margin-top:88pt">
+      <div class="col"><h2>ElevenLabs</h2><p>The phone line. It answers the call, and calls the patient back to book the time.</p></div>
+      <div class="col"><h2>Verda</h2><p>Sovereign AI. Qwen3 runs on Verda GPUs in Europe, on infrastructure we control. It turns speech into typed symptoms.</p></div>
+      <div class="col"><h2>Aiven</h2><p>Postgres with the ontology: the patient record, the clocks and the access log.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span class="lab">06 / Built on</span><span class="src">Polku as built: <a href="https://github.com/3nd3r1/polku">github.com/3nd3r1/polku</a></span></div>
+</section>
+
+<!-- 7 -->
+<section class="s">
+  <img class="logo" src="../../brand/kit/logo/svg/polku-lockup.svg">
+  <div class="body" style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <h1>Pathways by 2028,<br>says the strategy.<br><span class="m">We built one this weekend.</span></h1>
+      <p class="lead">Lung is one typed, cited file. The next cancer is the next file.</p>
+    </div>
+    <div style="text-align:right;margin-top:8pt">
+      <img src="qr-demo.svg" style="width:150pt;height:150pt;padding:10pt;background:#e6e6e3;display:block">
+      <p class="cap" style="margin-top:14pt;color:var(--fg)"><a href="https://polku.ender.fi/demo">polku.ender.fi</a></p>
+      <p class="cap" style="margin-top:2pt;font-size:11pt"><a href="https://github.com/3nd3r1/polku">github.com/3nd3r1/polku</a> (MIT)</p>
+    </div>
+  </div>
+  <div class="foot"><span class="lab">07 / Try it</span><span class="src">Source: <a href="https://files.hackjunction.app/resources/Kansallinen_syopastrategia_2026_2035_FINAL.pdf">national cancer strategy 2026-2035</a> and roadmap 2026-2031, measures 2.5.2, 3.1.2, 3.5.3</span></div>
+</section>
+
+<!-- 8 -->
+<section class="s" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+  <img src="../../brand/kit/logo/svg/polku-lockup.svg" style="height:56pt">
+  <h1 style="margin-top:48pt;font-size:32pt" class="m"><span class="m">Let's close the gap with ontology and sovereign AI.</span></h1>
+</section>
+
+</body></html>
