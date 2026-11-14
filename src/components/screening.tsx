@@ -302,7 +302,9 @@ function Column({ title, children }: { title: string; children: React.ReactNode 
 
 function Conversation({ c }: { c: CallView }) {
   const end = useRef<HTMLLIElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [c.transcript.length]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [c.transcript.length]);
   return (
     <Column title="Call">
       <ol className="flex flex-1 flex-col gap-3 overflow-y-auto p-5">
