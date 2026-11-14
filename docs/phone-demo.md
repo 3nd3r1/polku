@@ -11,7 +11,7 @@
 
 ### Free: let Polku ring you
 
-Calling the US number costs about 0.48 €/min on Elisa. Instead, open https://prod-polku.eros.ender.fi/demo (not linked in the nav on production) and press **Ring my phone**. Polku calls `DEMO_CALLBACK_NUMBER` from the Twilio number, paid from Twilio credit, and the call runs exactly like an inbound one: same greeting, same codes, same script below. Press any key for the trial notice first.
+Calling the US number costs about 0.48 €/min on Elisa. Instead, press **Call me** under the line number on the production Calls screen. Polku calls `DEMO_CALLBACK_NUMBER` from the Twilio number, paid from Twilio credit, and the call runs exactly like an inbound one: same greeting, same codes, same script below. Press any key for the trial notice first.
 
 ## Identity codes
 

@@ -10,10 +10,38 @@ import { ageOf } from "@/sim/people";
 import { clockTime, formatSpan, useNow, when } from "./time";
 
 /**
+ * The phone line's number, and "Call me": Polku rings the demo phone and the
+ * call runs exactly like an inbound one (free for us, unlike calling the US).
+ */
+function CallMe({ line }: { line: string }) {
+  const [state, setState] = useState<string | null>(null);
+  async function ring() {
+    setState("Ringing");
+    const res = await fetch("/api/calls/ring", { method: "POST" });
+    const r = (await res.json().catch(() => ({}))) as { error?: string };
+    setState(res.ok ? "Ringing. Answer, press any key." : (r.error ?? "Could not ring the phone"));
+  }
+  return (
+    <div className="border-t border-line px-5 py-4">
+      <p className="label">Phone line</p>
+      <p className="mt-1 font-mono text-sm">{line}</p>
+      <button
+        onClick={ring}
+        disabled={state === "Ringing"}
+        className="mt-3 h-9 w-full border border-line text-sm hover:border-fg disabled:opacity-50"
+      >
+        Call me
+      </button>
+      {state && <p className="mt-2 text-xs text-muted">{state}</p>}
+    </div>
+  );
+}
+
+/**
  * The call. Inbound calls arrive here; the handoff packet fills while the
  * patient talks, and the call ends with who has the patient next.
  */
-export function CallScreen() {
+export function CallScreen({ line }: { line: string | null }) {
   const [calls, setCalls] = useState<CallView[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -56,6 +84,7 @@ export function CallScreen() {
             );
           })}
         </div>
+        {line && <CallMe line={line} />}
         <p className="label border-t border-line px-5 py-3">Synthetic callers</p>
       </aside>
 
