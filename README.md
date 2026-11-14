@@ -33,7 +33,7 @@ npm install
 cp .env.example .env.local
 npm run db:up             # Postgres in Docker on port 5433
 npm run db:push           # create tables
-npm run db:seed           # synthetic register and open cases
+npm run db:seed           # synthetic register, empty task list
 npm run dev               # http://localhost:3000
 npm test
 ```

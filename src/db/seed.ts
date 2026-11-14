@@ -22,7 +22,7 @@ async function main() {
   }
 
   const { people, cases } = await resetDemo();
-  console.log(`Seeded ${people.length} synthetic people and ${cases} open cases.`);
+  console.log(`Seeded ${people.length} synthetic people and ${cases} open case(s).`);
   for (const p of people.filter((x) => !x.id.startsWith("p"))) {
     console.log(`  ${p.name.padEnd(16)} ${p.hetu}  ${ageOf(p)} y  ${p.county}`);
   }

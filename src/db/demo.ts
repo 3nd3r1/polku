@@ -1,6 +1,6 @@
 /**
- * The demo's known SYNTHETIC state: the population register and a set of open
- * cases at different pathway steps. Used by `npm run db:seed` and by the
+ * The demo's known SYNTHETIC state: the population register and one open case
+ * (Liisa, CT booked). Used by `npm run db:seed` and by the
  * production reset endpoint (POST /api/admin/reset).
  */
 import { sql } from "drizzle-orm";
@@ -8,20 +8,17 @@ import { evaluate } from "../ontology/engine";
 import { holderOf, MAY_OPEN } from "../ontology/record";
 import type { Intake } from "../ontology/schema";
 import { lung } from "../pathways/lung";
-import { ontologyPath, resourceCalendar, resourcesFor } from "../sim/capacity";
 import { ageOf, type Person, syntheticPeople } from "../sim/people";
 import { db } from "./index";
 import { audit, cases, clocks, people, recordAccess } from "./schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const INTAKES: Omit<Intake, "age">[] = [
-  { smoking: "former", observations: [{ code: "COUGH_NEW", durationDays: 49, quote: "I've had this cough for about seven weeks" }] },
-  { smoking: "current", observations: [{ code: "HAEMOPTYSIS", quote: "there was blood when I coughed" }] },
-  { smoking: "former", observations: [{ code: "HAEMOPTYSIS_REPEATED", quote: "I keep coughing up a bit of blood, it's happened several times" }] },
-  { smoking: "current", observations: [{ code: "DYSPNOEA_NEW", durationDays: 45, quote: "I get out of breath on the stairs now" }] },
-  { smoking: "never", observations: [{ code: "CHEST_PAIN", quote: "a pain in my chest that won't go away" }] },
-];
+/** Liisa's intake: the one seeded case, so a caller with an open case exists. */
+const LIISA_INTAKE: Omit<Intake, "age"> = {
+  smoking: "former",
+  observations: [{ code: "COUGH_NEW", durationDays: 49, quote: "I've had this cough for about seven weeks" }],
+};
 
 type CaseSeed = {
   person: Person;
@@ -29,41 +26,15 @@ type CaseSeed = {
   stepIndex: number;
   daysIntoStep: number;
   booked?: { inDays: number; at: string; unit: string };
-  /** Book the running step in the first free session (other patients' bookings fill the calendars). */
-  book?: boolean;
 };
-/** Which step each generated case is at: mostly new referrals and CT, a few further along. */
-const STEPS = [0, 1, 1, 0, 1, 3, 1, 0, 4, 1, 2, 1, 5, 0, 1, 6, 1];
 
-/** The i-th intake in rotation that fast-tracks for this person (age matters for some criteria). */
-function fastTrackIntake(person: Person, i: number) {
-  for (let k = 0; k < INTAKES.length; k++) {
-    const intake = INTAKES[(i + k) % INTAKES.length];
-    if (evaluate({ ...intake, age: ageOf(person) }, lung).outcome === "fast_track") return intake;
-  }
-  throw new Error(`No seed intake fast-tracks for ${person.id}`);
-}
-
-/** Deterministic: same cases on every seed. Some prior steps overran, so some promises are already broken. */
+/**
+ * Only Liisa has a case: her CT is already booked, so it is not a nurse task.
+ * The nurse's list starts empty and fills from calls.
+ */
 function caseSeeds(people: Person[]): CaseSeed[] {
   const liisa = people.find((p) => p.id === "liisa")!;
-  const seeds: CaseSeed[] = [
-    { person: liisa, intake: INTAKES[0], stepIndex: 1, daysIntoStep: 3, booked: { inDays: 2, at: "10:30", unit: "Lapin keskussairaala" } },
-  ];
-  people
-    .filter((p) => p.id.startsWith("p"))
-    .filter((_, i) => i % 3 === 0)
-    .forEach((person, i) => {
-      const stepIndex = STEPS[i % STEPS.length];
-      seeds.push({
-        person,
-        intake: fastTrackIntake(person, i),
-        stepIndex,
-        daysIntoStep: stepIndex === 0 ? (i % 4) * 0.3 : (i * 7) % 9,
-        book: stepIndex > 1 || i % 3 === 2,
-      });
-    });
-  return seeds;
+  return [{ person: liisa, intake: LIISA_INTAKE, stepIndex: 1, daysIntoStep: 3, booked: { inDays: 2, at: "10:30", unit: "Lapin keskussairaala" } }];
 }
 
 export async function peopleCount() {
@@ -80,7 +51,6 @@ export async function resetDemo() {
   await db.insert(people).values(register);
 
   const seeds = caseSeeds(register);
-  const taken = new Set<string>();
   for (const s of seeds) {
     const intake: Intake = { ...s.intake, age: ageOf(s.person) };
     const evaluation = evaluate(intake, lung);
@@ -128,14 +98,6 @@ export async function resetDemo() {
         const [h, m] = booked.at.split(":").map(Number);
         scheduledAt.setHours(h, m, 0, 0);
         unit = booked.unit;
-      } else if (current && s.book) {
-        const [r] = resourcesFor(s.person.county, step.id);
-        const free = r && resourceCalendar(r, new Date(now)).flatMap((d) => d.sessions).find((x) => !x.taken && !taken.has(`${r.id}@${x.at}`));
-        if (r && free) {
-          taken.add(`${r.id}@${free.at}`);
-          scheduledAt = new Date(free.at);
-          unit = ontologyPath(r).facility;
-        }
       }
       await db.insert(clocks).values({
         caseId: row.id,

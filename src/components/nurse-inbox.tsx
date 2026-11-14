@@ -53,7 +53,7 @@ export function NurseInbox() {
           <span className="text-dim">{items?.length ?? ""}</span>
         </p>
         <div className="flex-1 overflow-y-auto">
-          {items?.length === 0 && <p className="p-5 text-sm text-dim">No tasks. Everyone is booked.</p>}
+          {items?.length === 0 && <p className="p-5 text-sm text-dim">No tasks. A call to the line creates one.</p>}
           {items?.map((it) => (
             <button
               key={it.case.id}
