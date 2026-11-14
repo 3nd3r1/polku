@@ -41,7 +41,7 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 - Node comes from `shell.nix`: run `nix-shell` first (NixOS, no global node)
 - Next.js 16 has breaking changes: read `AGENTS.md` and `node_modules/next/dist/docs/` before writing Next-specific code
 
-Layout: `src/ontology/`, `src/pathways/`, `src/db/`, `src/server/`, `src/sim/`, `src/app/` (`/` Screening, `/nurse`, `/ontology`, `/cockpit` todo, `/api/*`), `agent/`, `eval/` (todo).
+Layout: `src/ontology/`, `src/pathways/`, `src/db/`, `src/server/`, `src/sim/`, `src/app/` (`/` Screening, `/nurse`, `/cockpit` todo, `/api/*`), `agent/`, `eval/` (todo).
 
 ## Working style
 
