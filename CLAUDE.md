@@ -2,13 +2,15 @@
 
 Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "Equal Care Across Finland".
 
-**Pitch:** a sovereign ontology for Finnish cancer care. A patient calls a phone line (ElevenLabs voice agent) and describes symptoms. The LLM only turns speech into typed symptom objects. A deterministic rules engine matches them against published Nordic lung cancer pathway criteria, each with a cited source. A nurse confirms, and every pathway step runs on a clock. A county cockpit rolls the clocks up per wellbeing county (hyvinvointialue). That's the Goal 3 indicator Finland can't measure today.
+**Pitch:** Polku does the handoffs between cancer care steps. A patient calls a phone line (ElevenLabs voice agent) and describes symptoms. The LLM only turns speech into typed symptom objects, and a deterministic rules engine matches them against published Nordic lung cancer pathway criteria, each with a cited source. The nurse gets one small task with a time already proposed by the rules. If they accept, the agent calls the patient back and books it. The same secured record moves on to the next step, and every access is logged. Polku doesn't replace the nurse's own system.
+
+**Focus:** the four elements in `docs/build-plan.md` (the call, the task view, the callback, the handoff strip). Demo and simulation tooling lives on `/demo` only, never on the product screens.
 
 ## Read first
 
 | Doc | What |
 |---|---|
-| `docs/build-plan.md` | **Source of truth for what to build**: scope with status, Polku's own rules, architecture, spikes, validation, build order, timeline |
+| `docs/build-plan.md` | **Source of truth for what to build**: the four elements, status, next steps, demo tooling, cuts, Polku's own rules |
 | `docs/product.md` | What Polku is: problem, Matti, the three surfaces, phone first and identification, sovereign ontology, safety, business |
 | `docs/design.md` | **Locked visual language**: colors, shape, type, layout, slide and video rules, prompt block for generated material. Logo still open |
 | `docs/story-and-demo.md` | Story, wow moments, table/AstraZeneca/stage run of show, video beat sheet, facts to check, Q&A |
@@ -42,7 +44,7 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 - Node comes from `shell.nix`: run `nix-shell` first (NixOS, no global node)
 - Next.js 16 has breaking changes: read `AGENTS.md` and `node_modules/next/dist/docs/` before writing Next-specific code
 
-Layout: `src/ontology/`, `src/pathways/`, `src/db/`, `src/server/`, `src/sim/`, `src/app/` (`/` Screening, `/nurse`, `/cockpit` todo, `/api/*`), `agent/`, `eval/` (todo).
+Layout: `src/ontology/`, `src/pathways/`, `src/db/`, `src/server/`, `src/sim/`, `src/app/` (`/` Screening, `/nurse` task view, `/demo` todo, `/api/*`), `agent/`, `eval/` (todo).
 
 ## Working style
 

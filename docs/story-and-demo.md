@@ -20,7 +20,7 @@ The pitch has six good ideas competing for the lead: sovereign ontology, phone f
 
 The time is lost between steps, not inside them: first contact, GP, X-ray, referral, CT, pulmonologist, each a separate handoff that nobody owns. (Claim to back with a source before it goes on a slide.)
 
-Polku closes the gaps because the ontology knows what comes next. A step knows its next step, the next step knows which capability it needs (CT), the capability knows which scanners provide it in the patient's county, and the scanner knows its free slots. So the moment one step ends, the next one is recommended, offered to the patient by SMS and booked. See "Handoff scheduler" in `build-plan.md`.
+Polku closes the gaps because the ontology knows what comes next. A step knows its next step, the next step knows which capability it needs (CT), the capability knows which scanners provide it in the patient's county, and the scanner knows its free slots. So the moment one step ends, the next one is recommended, offered to the patient by SMS and booked. See "What we're building" in `build-plan.md`.
 
 Shown as a relay: call → nurse within 2 days → CT slot offered and confirmed → CT done → pulmonologist offered → ... Each handoff has its own clock, and the cockpit measures the gap per county.
 
