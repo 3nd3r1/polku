@@ -10,6 +10,7 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 |---|---|
 | `docs/build-plan.md` | **Source of truth for what to build**: scope with status, Polku's own rules, architecture, spikes, validation, build order, timeline |
 | `docs/product.md` | What Polku is: problem, Matti, the three surfaces, phone first and identification, sovereign ontology, safety, business |
+| `docs/design.md` | **Locked visual language**: colors, shape, type, layout, slide and video rules, prompt block for generated material. Logo still open |
 | `docs/story-and-demo.md` | Story, wow moments, table/AstraZeneca/stage run of show, video beat sheet, facts to check, Q&A |
 | `docs/lung-pathway-sources.md` | Lung criteria (SE/DK/NO/FI), step time limits, symptom codes, public data. `src/pathways/lung.ts` is encoded from this |
 | `docs/strategy.md` | National cancer strategy and roadmap: Goal 3, measures 2.5.2, 3.1.2, 3.5.3, other evidence to verify |
