@@ -1,101 +1,62 @@
-# Polku
+<p align="center">
+  <img src="brand/images/cover.png" alt="Polku: every cancer pathway, on the clock" width="100%">
+</p>
 
-A phone line for suspected lung cancer. The caller describes their symptoms, a rules engine checks them against published Nordic referral criteria, and a nurse calls back by a deadline. Every pathway step after that runs on a clock, and the clocks roll up per wellbeing county.
+<p align="center">
+  <a href="https://polku.ender.fi/demo"><b>Live demo</b></a> ·
+  <a href="docs/product.md">Product</a> ·
+  <a href="docs/lung-pathway-sources.md">Sources</a> ·
+  Junction 2026 / AstraZeneca "Equal Care Across Finland"
+</p>
 
-Built at Junction 2026 for the AstraZeneca challenge "Equal Care Across Finland". Try the public demo at https://polku.ender.fi/demo.
+---
 
-## Why
+**Polku does the handoffs between cancer care steps.** A patient calls a phone line and describes their symptoms. A rules engine checks them against published Nordic lung cancer criteria. The nurse gets one small task with a time already proposed. They accept, Polku calls the patient back and books it, and the case moves on to the next step with its own clock.
 
-Finland's cancer strategy measures equality as "patients get treatment within target times", but nothing records those times per county today. Finland also has no national lung cancer pathway yet. Polku runs the pathway and the measurement comes out of it. Sources are in `docs/strategy.md` and `docs/lung-pathway-sources.md`.
+Finland measures cancer care equality by target times, but nothing records those times per county, and there is no national lung pathway yet. Polku runs the pathway, so the measurement comes out of it.
 
-## How a call works
+## How it works
 
-1. The caller gives their identity code and confirms with Mobile ID (simulated). Until then the agent can't read anything about anyone, and after that only the caller's own case. The server enforces this in `src/server/identity.ts` and logs every tool call.
-2. The voice agent (ElevenLabs) turns what the caller says into typed symptoms. It doesn't triage or diagnose.
-3. A deterministic engine matches the symptoms against criteria in `src/pathways/lung.ts`, each with a cited source. Red flags always return "call 112".
-4. A match opens a case with a nurse callback deadline, which the agent reads out. When the nurse confirms, each pathway step gets its own deadline.
+```
+call ──▶ identify ──▶ extract symptoms ──▶ match criteria ──▶ nurse task ──▶ callback ──▶ next step
+         Mobile ID     LLM, typed only      deterministic       one click     voice agent    on the clock
+```
 
-Patients only ever use a phone. All screens are for staff:
+- **The LLM never triages.** It only turns speech into typed symptoms. Matching is deterministic, in [`src/pathways/lung.ts`](src/pathways/lung.ts), and every criterion cites its source.
+- **Red flags always mean "call 112"**, enforced in the engine, not the prompt.
+- **The caller only sees their own case**, after identification. Every access is logged.
+- **Patients only use a phone.** Every screen is for staff.
 
-| Screen | Who | What |
-|---|---|---|
-| Screening (`/`) | Care team | Each call live: identity, symptoms, criteria match, outcome |
-| Nurse (`/nurse`) | Callback nurse | Cases to call back, step clocks, the next action |
-| Cockpit | County | Not built yet |
-
-No microphone? On the demo site, "Play a call" on `/demo` runs scripted synthetic callers through the same API, including an impostor who tries to skip identification. Demo identity codes are in `agent/README.md`.
+<p align="center">
+  <img src="brand/images/pathway.png" alt="Seven steps, seven clocks" width="100%">
+</p>
 
 ## Run it
 
 ```sh
-nix-shell                 # Node 22 on NixOS, otherwise any Node 22
-npm install
+nix-shell                     # or any Node 22
 cp .env.example .env.local
-npm run db:up             # Postgres in Docker on port 5433
-npm run db:push           # create tables
-npm run db:seed           # synthetic register, empty task list
-npm run dev               # http://localhost:3000
-npm test
+npm install
+npm run db:up && npm run db:push && npm run db:seed
+npm run dev                   # http://localhost:3000
 ```
 
-Or everything in Docker, Postgres and the production build with schema and seed included:
+Or all in Docker: `npm run up`. Voice calls need an ElevenLabs agent ([`agent/README.md`](agent/README.md)). Deploy and the phone line: [`docs/deploy.md`](docs/deploy.md).
 
-```sh
-cp .env.example .env.local   # once
-npm run up                   # http://localhost:3000
-```
+## Stack
 
-Without npm: `docker compose --env-file .env.local up --build`.
-
-Voice calls need an ElevenLabs agent, see `agent/README.md`. To call the real number, see `docs/phone-demo.md`.
-
-The real phone line is a Twilio number on ElevenLabs answered by "Polku Phone", a copy of the agent whose tools are webhooks to `/api/phone/[tool]` on production. `npm run agent:phone` (after `agent:push`) creates or updates it and points the number at it. When the nurse accepts times, production rings `DEMO_CALLBACK_NUMBER`. The Twilio account is a trial: it only calls verified numbers and plays a trial notice first (press any key).
-
-## Deploy
-
-Pushing to main deploys through Coolify (Dockerfile build, Aiven Postgres). The container creates the schema and seeds on first boot.
-
-```sh
-npm run deploy            # manual redeploy if the webhook fails
-npm run demo:reset        # wipe and reseed local and production (or: demo:reset local, demo:reset prod)
-npm run agent:push        # push prompt and tools to ElevenLabs
-```
-
-### Two sites
-
-Both are Coolify apps in the `polku` project, built from `main` with the same Dockerfile.
-
-| | Production | Public demo |
-|---|---|---|
-| Coolify environment | `production` | `demo` |
-| URL | https://prod-polku.eros.ender.fi | https://polku.ender.fi |
-| Database (Aiven) | `defaultdb` | `polku_demo` |
-| For | us: voice calls, the pitch, the video | anyone: the link we hand out, start at `/demo` |
-| `NEXT_PUBLIC_DEMO_SITE` (build time) | unset | `1` |
-| `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` | set | unset |
-| `SITE_PASSWORD` | set: the browser asks for it once, any user name | unset |
-
-The demo site has no voice calls: scripted callers on `/demo` stand in for the phone, a scripted patient answers the callback, and the reset needs no token. It does not deploy on push: run `npm run deploy:demo`.
-
-## Code
+Next.js 16 · React 19 · TypeScript · Tailwind 4 · zod · Drizzle + Postgres · ElevenLabs + Twilio · vitest
 
 | Path | What |
 |---|---|
-| `src/pathways/lung.ts` | Lung pathway: criteria, steps, time limits, sources |
-| `src/ontology/` | Intake schema (zod), rules engine, tests |
-| `src/server/` | Calls, identification, intake, nurse actions, live updates |
-| `src/db/` | Drizzle schema: calls, cases, clocks, audit |
-| `src/app/api/` | Agent tools, cases, SSE events |
-| `agent/` | Voice agent prompt and setup |
-| `docs/` | Product, build plan, demo, research |
+| `src/pathways/` | Lung pathway: criteria, steps, time limits, sources |
+| `src/ontology/` | Intake schema and rules engine |
+| `src/server/` | Calls, identification, nurse actions, live updates |
+| `src/app/` | Staff screens and API |
+| `agent/` | Voice agent prompt and tools |
 
 ## Limits
 
-- All data is synthetic. Nobody in the register is real.
-- Identification is simulated. A real version would use Suomi.fi e-Identification or a Mobile ID provider.
-- Finland has no lung pathway target times yet, so we use the Swedish ones as placeholders.
-- It isn't a medical device. Clinical use would need CE marking, and a nurse makes every clinical decision.
-
-## License
+Synthetic data only. Identification is simulated. Target times are Swedish placeholders until Finland sets its own. Not a medical device: a nurse makes every clinical decision.
 
 MIT
