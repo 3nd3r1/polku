@@ -6,7 +6,7 @@ import { SAMPLES, simulateCall, simulateCallback } from "@/demo/scripts";
 import type { CallView } from "@/server/calls";
 import { ageOf, syntheticPeople } from "@/sim/people";
 import { post, usePhone } from "./agent-call";
-import { clockTime } from "./time";
+import { clockTime, useNow } from "./time";
 
 /** What each role-card person should say to get each outcome. */
 const ROLE_CARDS: Record<string, string> = {
@@ -27,6 +27,8 @@ export function DemoTools() {
   const [token, setToken] = useState("");
   const [resetState, setResetState] = useState<string | null>(null);
   const people = syntheticPeople(4);
+  // Ages depend on today: computed on the client only, so the page can prerender.
+  const now = useNow();
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/calls", { cache: "no-store" });
@@ -83,7 +85,8 @@ export function DemoTools() {
                   <td className="py-3 pr-4">{p.name}</td>
                   <td className="py-3 pr-4 font-mono text-xs">{p.hetu}</td>
                   <td className="py-3 pr-4 text-muted">
-                    {ageOf(p)}, {p.county}
+                    {now !== null && `${ageOf(p, new Date(now))}, `}
+                    {p.county}
                   </td>
                   <td className="py-3 text-muted">{ROLE_CARDS[p.id]}</td>
                 </tr>
