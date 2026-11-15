@@ -54,8 +54,8 @@ The national cancer strategy 2026-2035 and its roadmap call for symptom-based re
 
 The customers are the wellbeing counties. They already run phone lines and callback queues, so Polku is a better phone line that produces the indicator they will be asked to report. Lung comes first, then the other roadmap cancers.
 
-## Honesty notes
-Patients and pathway clocks in the demo are synthetic. The Filha figure and the county guidance are real public sources. Mobile ID is simulated. Symptom extraction runs on Qwen3 on Verda in the EU, with hosted Gemini as a fallback if that endpoint is slow or down. ElevenLabs routes voice audio through the US on our tier, so a fully EU call is a goal, not the current state. Only lung is encoded, and other pathways in the video are illustrative. This is a research prototype, not for clinical use, and it would need a medical device conformity assessment before clinical use.
+## How much did we actually build
+The calling actually works: you can phone the line, the agent identifies you and takes your symptoms, and it calls you back to book the time the nurse accepted. The pipeline is implemented up to the CT handoff, and the steps after that are seeded demo cases. Patients, Mobile ID and the calendars are synthetic.
 ```
 
 ## Challenge
