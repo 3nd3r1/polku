@@ -1,11 +1,10 @@
 # Deploy and operations
 
-After the event production, the phone line and the Verda model were shut down. Only the public demo site is left, and on 16.11 its database moved from Aiven to a Postgres 16 container on the same Coolify server (`polku-demo-db` in the `demo` environment). The rest of this page is how both sites ran during the event.
+On 16.11, after the event, we deleted production and its Coolify environment, and shut down the phone line and the Verda model. Only the public demo site is left: the `polku-demo` app and its database `polku-demo-db` (Postgres 16, moved from Aiven the same day) in the `demo` environment. It doesn't deploy on push. Run `npm run deploy:demo` to rebuild it from `main`. The rest of this page is how both sites ran during the event.
 
 Pushing to main deployed production through Coolify (Dockerfile build, Aiven Postgres). The container creates the schema and seeds on first boot.
 
 ```sh
-npm run deploy            # manual redeploy if the webhook fails
 npm run deploy:demo       # the demo site does not deploy on push
 npm run demo:reset        # wipe and reseed local and production (or: demo:reset local, demo:reset prod)
 npm run agent:push        # push prompt and tools to ElevenLabs
