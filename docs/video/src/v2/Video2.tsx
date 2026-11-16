@@ -6,7 +6,7 @@ import { PeopleCtx } from "./people";
 import { MusicBed, Soundtrack } from "./audio";
 import { A_Table, B_Text, C_Dial, D_Call, E_Promise, F_Nurse, G_112, H_Map, K_End, O_Ontology, P_Sovereign, PROMISE_CLOCK_START } from "./scenes2";
 
-// docs/story-and-demo.md, "Video (2:00 hard cap)". Ending: partners, the ontology build, the drop.
+// docs/hackathon/story-and-demo.md, "Video (2:00 hard cap)". Ending: partners, the ontology build, the drop.
 // Every length is a multiple of 0.5 s so the score's 120 BPM grid stays put; the cut lands at 1:59.
 // `src` is where the scene's slice of the score starts (score.mp3 seconds): the score was composed
 // to the original scene lengths, so each scene plays its own section, trimmed to its new length.

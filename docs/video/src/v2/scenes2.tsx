@@ -1,5 +1,5 @@
 /**
- * Video 2: built strictly to the beat sheet in docs/story-and-demo.md, "Video (2:00 hard cap)".
+ * Video 2: built strictly to the beat sheet in docs/hackathon/story-and-demo.md, "Video (2:00 hard cap)".
  * Dialogue is the scripted Matti call from src/components/screening.tsx (synthetic people).
  */
 import React from "react";
@@ -10,7 +10,7 @@ import { COUNTY_SEATS, makeDots } from "./finland";
 import { A_TablePeople, CallFootage, DialFootage, E_PromisePeople, usePeople } from "./people";
 
 export const FACTS2 = {
-  // UNVERIFIED (docs/story-and-demo.md, "Facts to check"). Swap for the strategy's +14 points if it doesn't hold.
+  // UNVERIFIED (docs/hackathon/story-and-demo.md, "Facts to check"). Swap for the strategy's +14 points if it doesn't hold.
   heroDays: 155,
   heroSource: "Yle MOT, yle.fi/a/74-20251023",
 };

@@ -1,6 +1,8 @@
 # Deploy and operations
 
-Pushing to main deploys production through Coolify (Dockerfile build, Aiven Postgres). The container creates the schema and seeds on first boot.
+After the event production, the phone line and the Verda model were shut down. Only the public demo site is left, and on 16.11 its database moved from Aiven to a Postgres 16 container on the same Coolify server (`polku-demo-db` in the `demo` environment). The rest of this page is how both sites ran during the event.
+
+Pushing to main deployed production through Coolify (Dockerfile build, Aiven Postgres). The container creates the schema and seeds on first boot.
 
 ```sh
 npm run deploy            # manual redeploy if the webhook fails
@@ -30,4 +32,4 @@ The demo site has no voice calls: scripted callers on `/demo` stand in for the p
 
 The real phone line is a Twilio number on ElevenLabs answered by "Polku Phone", a copy of the agent whose tools are webhooks to `/api/phone/[tool]` on production. `npm run agent:phone` (after `agent:push`) sets it up. When the nurse accepts times, production rings `DEMO_CALLBACK_NUMBER`.
 
-The Twilio account is a trial: it only calls verified numbers and plays a trial notice first (press any key). Agent setup and demo identity codes: `agent/README.md`. Calling the real number: `docs/phone-demo.md`.
+The Twilio account is a trial: it only calls verified numbers and plays a trial notice first (press any key). Agent setup and demo identity codes: `agent/README.md`. Calling the real number: `docs/hackathon/phone-demo.md`.

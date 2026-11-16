@@ -68,7 +68,7 @@ Precedents: Kela lets callers identify in OmaKela first and type a code during t
 - **Pathway as code.** Each pathway is one typed, versioned definition of criteria, steps and time limits, and every rule cites its source (`src/pathways/lung.ts`). A new cancer is a new file, not a new product.
 - **Objects, links, actions.** Callers, cases, criteria, steps, clocks, counties, hospitals and resources are typed objects (`src/ontology/`). Every change is a typed action with a permitted role and an audit entry.
 - **Deterministic where it matters.** The LLM only turns speech into typed symptoms. Matching is rules, and every outcome can be traced to a source.
-- **Sovereign data (target, not yet true).** Personal data processed only by an open model (Gemma) on EU infrastructure (Verda). Hosted models (Gemini) see only county totals. Today the voice agent runs on ElevenLabs, which on our tier routes voice through the US. Say so before anyone asks: the voice layer is swappable.
+- **Sovereign data (partly true).** The agent's language model was an open model (Qwen3) on EU infrastructure we controlled (Verda). The voice layer ran on ElevenLabs, which on our tier routes audio through the US, so a fully EU call was the target, not the state. The voice layer is swappable.
 
 ## Safety and regulation
 

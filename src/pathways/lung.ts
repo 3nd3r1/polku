@@ -41,7 +41,7 @@ export const lung = {
       title: "Polku design choice (not from a published pathway)",
       name: "Polku's own rules, not a published pathway",
       spokenName: "Polku's own safety rules",
-      url: "https://github.com/3nd3r1/polku/blob/main/docs/build-plan.md#polkus-own-rules",
+      url: "https://github.com/3nd3r1/polku/blob/main/docs/architecture.md#polkus-own-rules",
       verification: "design_choice",
     },
   ],

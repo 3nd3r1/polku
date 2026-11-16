@@ -4,7 +4,7 @@ Locked visual language for everything Polku ships: the app, slides, the video, t
 
 Reference: Palantir's dark product and brand look (near-black surfaces, hairlines, square geometry, monochrome with color only for status). We copy the language, never the branding: no Palantir name, logo or product screenshots in anything we make.
 
-Status: colors, shape, type, layout and imagery are **locked**. Logo is **open** (see the end).
+Status: colors, shape, type, layout, imagery and the logo are locked.
 
 ## Principles
 
@@ -145,11 +145,4 @@ icons, no people, no logos of other companies.
 
 ## Logo
 
-**Open, not locked.** Decided so far:
-
-- The name stays **Polku**.
-- Wordmark text: `POLKU`, Geist 600, uppercase, tracking `0.2em`, `fg` on `base`.
-- Placeholder mark in the app: a 12px solid `fg` square left of the wordmark (`src/components/nav.tsx`).
-- Direction: a simple geometric mark in the same family as Palantir's, single color, works at 16px, drawn with the shape rules above. It must be our own shape, not a copy of theirs.
-
-Until the mark is locked, use the wordmark with the placeholder square everywhere.
+Locked. A solid square split by a stepped path, next to the wordmark `POLKU` (Geist 600, uppercase, tracking `0.2em`). Files and rules: `docs/brand/kit/README.md`.

@@ -4,21 +4,19 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 
 **Pitch:** Polku does the handoffs between cancer care steps. A patient calls a phone line (ElevenLabs voice agent) and describes symptoms. The LLM only turns speech into typed symptom objects, and a deterministic rules engine matches them against published Nordic lung cancer pathway criteria, each with a cited source. The nurse gets one small task with a time already proposed by the rules. If they accept, the agent calls the patient back and books it. The same secured record moves on to the next step, and every access is logged. Polku doesn't replace the nurse's own system.
 
-**Focus:** the four elements in `docs/build-plan.md` (the call, the task view, the callback, the handoff strip). Demo and simulation tooling lives on `/demo` only, never on the product screens.
+**Status:** archived after the event. The public demo site (https://polku.ender.fi) stays up. Production, the phone line and the Verda model are shut down.
 
 ## Read first
 
 | Doc | What |
 |---|---|
-| `docs/build-plan.md` | **Source of truth for what to build**: the four elements, status, next steps, demo tooling, cuts, Polku's own rules |
-| `docs/product.md` | What Polku is: problem, Matti, the three surfaces, phone first and identification, sovereign ontology, safety, business |
-| `docs/design.md` | **Locked visual language**: colors, shape, type, layout, slide and video rules, prompt block for generated material. Logo still open |
-| `docs/story-and-demo.md` | Story, wow moments, table/AstraZeneca/stage run of show, video beat sheet, facts to check, Q&A |
-| `docs/lung-pathway-sources.md` | Lung criteria (SE/DK/NO/FI), step time limits, symptom codes, public data. `src/pathways/lung.ts` is encoded from this |
-| `docs/strategy.md` | National cancer strategy and roadmap: Goal 3, measures 2.5.2, 3.1.2, 3.5.3, other evidence to verify |
-| `docs/tech-challenges.md` | Side prizes we enter and each one's job in the architecture |
-| `docs/submission.md` | Junction submission form draft |
-| `docs/reference/` | Event schedule, rules, submission checklist, the AstraZeneca brief |
+| `docs/architecture.md` | How it works technically, and Polku's own rules (linked from `src/pathways/lung.ts`) |
+| `docs/product.md` | What Polku is: problem, Matti, surfaces, phone first and identification, safety, business |
+| `docs/lung-pathway-sources.md` | Lung criteria (SE/DK/NO/FI), step time limits, symptom codes. `src/pathways/lung.ts` is encoded from this |
+| `docs/strategy.md` | National cancer strategy and roadmap measures |
+| `docs/design.md` | Locked visual language |
+| `docs/deploy.md` | Coolify deployments and the phone line |
+| `docs/hackathon/` | Event-weekend notes: build plan, story and demo, submission, reference material |
 
 ## Hard rules
 
@@ -30,13 +28,6 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 - Every criterion and every number shown cites its source.
 - Commit messages: no trailers, no Co-Authored-By, no session links.
 
-## Deadlines
-
-- **Fri 23:59:** draft submission on the Junction Platform
-- **Sun 10:00:** FINAL submission (aim for 09:00). Video max 2:00.
-- **Sun 10:30-14:00:** peer review, both team members present
-- **Sun 14:00:** AstraZeneca judging
-
 ## Stack
 
 - Next.js 16 (App Router, `src/`), React 19, TypeScript, Tailwind 4
@@ -44,7 +35,7 @@ Junction 2026 hackathon project (Espoo, 13-15 Nov 2026), AstraZeneca challenge "
 - Node comes from `shell.nix`: run `nix-shell` first (NixOS, no global node)
 - Next.js 16 has breaking changes: read `AGENTS.md` and `node_modules/next/dist/docs/` before writing Next-specific code
 
-Layout: `src/ontology/`, `src/pathways/`, `src/db/`, `src/server/`, `src/sim/`, `src/app/` (`/` Screening, `/nurse` task view, `/demo` todo, `/api/*`), `agent/`, `eval/` (todo).
+Layout: `src/ontology/`, `src/pathways/`, `src/db/`, `src/server/`, `src/sim/`, `src/demo/`, `src/app/` (`/` Calls, `/nurse` Tasks, `/handoffs`, `/demo`, `/api/*`), `agent/`. Everything that isn't app code (video, brand, pitch, screenshots) lives under `docs/`.
 
 ## Working style
 

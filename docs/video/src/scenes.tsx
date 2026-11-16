@@ -7,7 +7,7 @@ import { C, FPS, MONO, SANS, s } from "./theme";
 /* Facts used on screen. Change here, not in the scenes.               */
 /* ------------------------------------------------------------------ */
 export const FACTS = {
-  // UNVERIFIED, see docs/story-and-demo.md "Facts to check". Swap if it doesn't hold.
+  // UNVERIFIED, see docs/hackathon/story-and-demo.md "Facts to check". Swap if it doesn't hold.
   heroDays: 155,
   heroSource: "Yle MOT, yle.fi/a/74-20251023",
   promise: "Sunday 21:47",

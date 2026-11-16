@@ -14,7 +14,7 @@ import { publishChange } from "./bus";
 
 const API = "https://api.elevenlabs.io/v1/convai";
 
-/** The Twilio number on ElevenLabs (trial, US). See docs/phone-demo.md. */
+/** The Twilio number on ElevenLabs (trial, US). See docs/hackathon/phone-demo.md. */
 export const PHONE_LINE = "+1 952 248 7540";
 const apiKey = () => process.env.ELEVENLABS_API_KEY ?? process.env.ELEVEN_LABS_API_KEY;
 

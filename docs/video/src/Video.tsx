@@ -4,7 +4,7 @@ import { Label } from "./components";
 import { Call, Cockpit, Code, ColdOpen, Dial, End, Nurse, PromiseScene, RedFlag, TheNumber } from "./scenes";
 import { C, FPS, MONO, s } from "./theme";
 
-// Beat sheet: docs/story-and-demo.md "Video". Durations in seconds.
+// Beat sheet: docs/hackathon/story-and-demo.md "Video". Durations in seconds.
 export const SCENES = [
   { id: "cold-open", sec: 10, C: ColdOpen },
   { id: "number", sec: 10, C: TheNumber },
