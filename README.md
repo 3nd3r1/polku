@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://polku.ender.fi/demo">Live demo</a> ·
-  <a href="docs/video/PolkuV3.mp4">Video (2 min)</a> ·
+  <a href="https://www.youtube.com/watch?v=DM7m4YDkjc0">Video (2 min)</a> ·
   <a href="docs/Polku-white-paper.pdf">White paper</a> ·
   <a href="docs/pitch/polku-deck.pdf">Pitch deck</a>
 </p>

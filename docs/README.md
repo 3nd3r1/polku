@@ -10,7 +10,7 @@
 | [`deploy.md`](deploy.md) | How production and the demo site ran on Coolify, and the phone line |
 | [`Polku-white-paper.pdf`](Polku-white-paper.pdf) | White paper ([print version](Polku-white-paper-print.pdf)) |
 | [`pitch/`](pitch/) | Pitch deck PDF and its HTML source, pilot one-pager |
-| [`video/`](video/) | The submission video (`PolkuV3.mp4`, final, and `PolkuV2.mp4`) and its Remotion source |
+| [`video/`](video/) | The submission video (`PolkuV3.mp4`, final, also [on YouTube](https://www.youtube.com/watch?v=DM7m4YDkjc0), and `PolkuV2.mp4`) and its Remotion source |
 | [`brand/`](brand/) | Logo kit and slide templates |
 | [`screenshots/`](screenshots/) | Screens from the demo site, used in the main README |
 | [`hackathon/`](hackathon/) | Working notes from the event: build plan, story and demo script, submission text, tech challenges, the event brief |
